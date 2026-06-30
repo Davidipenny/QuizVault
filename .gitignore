@@ -43,3 +43,6 @@ legacy/
 
 # ─── Obsidian ───
 .obsidian/
+
+# ─── 测试 ───
+test/
