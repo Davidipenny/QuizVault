@@ -1,0 +1,38 @@
+# Python 字节码缓存，运行时自动生成
+__pycache__/
+*.pyc
+*.pyo
+
+# 旧版单文件题库（已被 banks/ 文件夹题库取代）
+questions.json
+
+# ─── 题库运行时数据（每个题库文件夹内自动生成） ───
+# 错题本：答错的题目记录及次数
+banks/*/wrong_questions.json
+# 收藏夹：用户创建的题目收藏集合
+banks/*/collections.json
+# 刷题进度：中途退出时保存的答题位置和状态
+banks/*/quiz_progress.json
+# 标记题目：刷题时按 F 标记的待修改题目
+banks/*/flagged.json
+# 批量删除备份：批量删题时自动备份的已删除题目
+banks/*/deleted_questions.json
+
+# ─── PyInstaller 打包产物 ───
+# 打包过程中的中间文件
+build/
+# 打包生成的可执行文件（quiz.exe、quiz_gui.exe）
+dist/
+*.exe
+
+# ─── 工具和编辑器 ───
+# Claude Code 的项目级配置和记忆文件
+.claude/
+# Superpowers 开发工具的工作文件
+.superpowers/
+# Superpowers 生成的设计文档和计划
+docs/superpowers/
+# pytest 测试缓存（.cache/ 目录）
+.pytest_cache/
+# Python 打包元数据（setuptools 生成）
+*.egg-info/
