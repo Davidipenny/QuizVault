@@ -4,7 +4,7 @@ a = Analysis(
     ['gui/main.py'],
     pathex=['.', 'gui'],
     binaries=[],
-    datas=[],
+    datas=[('banks', 'banks')],
     hiddenimports=[
         'bank_manager',
         'parse_markdown',
@@ -38,6 +38,6 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,
+    console=False,
     icon=None,
 )
