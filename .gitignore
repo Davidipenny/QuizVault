@@ -40,3 +40,6 @@ docs/superpowers/
 
 # ─── 已废弃的终端版本 ───
 legacy/
+
+# ─── Obsidian ───
+.obsidian/
