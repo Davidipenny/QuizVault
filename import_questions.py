@@ -54,23 +54,25 @@ def validate_question(q: Dict) -> List[str]:
     elif q['type'] == 'truefalse':
         if len(q['options']) != 2:
             errors.append(f"判断题必须有 2 个选项，当前为 {len(q['options'])} 个")
-    elif len(q['options']) < 4:
-        errors.append(f"options 不足 4 个，当前为 {len(q.get('options', {}))} 个")
+    elif q['type'] in ('single', 'multi'):
+        if len(q['options']) < 3 or len(q['options']) > 4:
+            errors.append(f"{q['type']}题必须有 3-4 个选项，当前为 {len(q['options'])} 个")
 
     # 答案检查
     answer = q['answer'].upper()
+    valid_letters = ''.join(sorted(q['options'].keys()))  # 动态获取有效字母
     if q['type'] == 'truefalse':
         if answer not in ('A', 'B'):
             errors.append(f"answer 无效: 判断题答案必须是 A 或 B，当前为 \"{q['answer']}\"")
     elif q['type'] == 'single':
-        if len(answer) != 1 or answer not in 'ABCD':
-            errors.append(f"answer 无效: 单选答案必须是 A-D 中的一个字母，当前为 \"{q['answer']}\"")
+        if len(answer) != 1 or answer not in valid_letters:
+            errors.append(f"answer 无效: 单选答案必须是 {valid_letters} 中的一个字母，当前为 \"{q['answer']}\"")
     elif q['type'] == 'multi':
-        if len(answer) < 2 or len(answer) > 4:
-            errors.append(f"answer 无效: 多选答案必须是 2-4 个字母，当前为 {len(answer)} 个")
+        if len(answer) < 2 or len(answer) > len(valid_letters):
+            errors.append(f"answer 无效: 多选答案必须是 2-{len(valid_letters)} 个字母，当前为 {len(answer)} 个")
         elif len(answer) != len(set(answer)):
             errors.append(f"answer 无效: 多选答案有重复字母: {q['answer']}")
-        elif not all(c in 'ABCD' for c in answer):
+        elif not all(c in valid_letters for c in answer):
             errors.append(f"answer 无效: 多选答案包含无效字母: {q['answer']}")
 
     return errors

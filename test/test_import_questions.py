@@ -110,16 +110,16 @@ class TestValidateQuestion(unittest.TestCase):
         self.assertTrue(any('answer' in e for e in errors))
 
     def test_insufficient_options(self):
-        """选项不足 4 个应报错"""
+        """选项不足 3 个应报错"""
         q = {
             'id': 1,
             'type': 'single',
             'question': '测试题目',
-            'options': {'A': '选项A', 'B': '选项B', 'C': '选项C'},
+            'options': {'A': '选项A', 'B': '选项B'},
             'answer': 'A'
         }
         errors = validate_question(q)
-        self.assertTrue(any('options' in e for e in errors))
+        self.assertTrue(any('选项' in e for e in errors))
 
 
 class TestOptionConversion(unittest.TestCase):

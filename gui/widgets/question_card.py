@@ -51,6 +51,7 @@ class QuestionCard(tk.Frame):
         self.check_vars = {}
         self._locked = False
         self._question_type = q['type']
+        self._options = q['options']  # 保存选项引用
 
         # 题干
         type_tags = {
@@ -61,10 +62,11 @@ class QuestionCard(tk.Frame):
         type_tag = type_tags.get(q['type'], '【单选】')
         self.question_label.config(text=f"{type_tag} {q['question']}")
 
-        # 选项
+        # 选项 - 动态遍历，支持 2-4 个选项
+        sorted_letters = sorted(q['options'].keys())
         if q['type'] == 'truefalse':
             # 判断题：垂直排列
-            for letter in sorted(q['options'].keys()):
+            for letter in sorted_letters:
                 rb = tk.Radiobutton(
                     self.options_frame,
                     text=f"{letter}. {q['options'][letter]}",
@@ -74,29 +76,27 @@ class QuestionCard(tk.Frame):
                 rb.pack(fill=tk.X, pady=2)
                 self.option_widgets.append(rb)
         elif q['type'] == 'single':
-            for letter in ['A', 'B', 'C', 'D']:
-                if letter in q['options']:
-                    rb = tk.Radiobutton(
-                        self.options_frame,
-                        text=f"{letter}. {q['options'][letter]}",
-                        variable=self.selected_answer, value=letter,
-                        font=("Microsoft YaHei", 11), anchor=tk.W,
-                    )
-                    rb.pack(fill=tk.X, pady=2)
-                    self.option_widgets.append(rb)
-        else:
-            for letter in ['A', 'B', 'C', 'D']:
-                if letter in q['options']:
-                    var = tk.BooleanVar()
-                    self.check_vars[letter] = var
-                    cb = tk.Checkbutton(
-                        self.options_frame,
-                        text=f"{letter}. {q['options'][letter]}",
-                        variable=var,
-                        font=("Microsoft YaHei", 11), anchor=tk.W,
-                    )
-                    cb.pack(fill=tk.X, pady=2)
-                    self.option_widgets.append(cb)
+            for letter in sorted_letters:
+                rb = tk.Radiobutton(
+                    self.options_frame,
+                    text=f"{letter}. {q['options'][letter]}",
+                    variable=self.selected_answer, value=letter,
+                    font=("Microsoft YaHei", 11), anchor=tk.W,
+                )
+                rb.pack(fill=tk.X, pady=2)
+                self.option_widgets.append(rb)
+        else:  # multi
+            for letter in sorted_letters:
+                var = tk.BooleanVar()
+                self.check_vars[letter] = var
+                cb = tk.Checkbutton(
+                    self.options_frame,
+                    text=f"{letter}. {q['options'][letter]}",
+                    variable=var,
+                    font=("Microsoft YaHei", 11), anchor=tk.W,
+                )
+                cb.pack(fill=tk.X, pady=2)
+                self.option_widgets.append(cb)
 
         # 清空反馈
         self.feedback_label.config(text="")
@@ -142,10 +142,9 @@ class QuestionCard(tk.Frame):
         """
         if self._locked:
             return
-        # 判断题只接受 A/B
-        if hasattr(self, '_question_type') and self._question_type == 'truefalse':
-            if letter not in ('A', 'B'):
-                return
+        # 检查选项是否存在
+        if not hasattr(self, '_options') or letter not in self._options:
+            return
         if self.check_vars:  # 多选 - 切换
             if letter in self.check_vars:
                 self.check_vars[letter].set(not self.check_vars[letter].get())

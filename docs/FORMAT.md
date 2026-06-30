@@ -191,7 +191,7 @@ questions:
 | id | int | 是 | 题目编号，同类型内唯一（判断 1-N，单选 1-N，多选 1-N） |
 | type | string | 是 | 题型：`"truefalse"`、`"single"` 或 `"multi"` |
 | question | string | 是 | 题目文本（不含题号和括号） |
-| options | list | 是 | 选项列表，判断题 2 个，单选/多选 4 个 |
+| options | list | 是 | 选项列表，判断题 2 个，单选/多选 3-4 个 |
 | answer | string | 是 | 答案（见下方答案格式规则） |
 | explanation | string | 否 | 解析内容，可为空字符串 |
 | source | string | 否 | 来源文件名 |
@@ -282,7 +282,7 @@ questions:
 ### 3.3 选项校验
 
 - 判断题：必须恰好 2 个选项（A、B）
-- 单选/多选题：必须恰好 4 个选项（A-D）
+- 单选/多选题：必须 3-4 个选项（A-C 或 A-D）
 - 选项以列表或字典形式存储均可，导入时自动转换
 
 ### 3.4 答案格式校验
