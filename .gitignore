@@ -24,6 +24,8 @@ build/
 # 打包生成的可执行文件（quiz.exe、quiz_gui.exe）
 dist/
 *.exe
+# 打包 zip（上传到 GitHub Releases，不提交到仓库）
+*.zip
 
 # ─── 工具和编辑器 ───
 # Claude Code 的项目级配置和记忆文件
