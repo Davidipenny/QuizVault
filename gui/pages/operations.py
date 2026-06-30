@@ -47,6 +47,8 @@ class OperationsPage(tk.Frame):
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
         buttons = [
+            ("顺序刷题（判断）", lambda: self._start_quiz('sequential', 'truefalse')),
+            ("随机刷题（判断）", lambda: self._start_quiz('random', 'truefalse')),
             ("顺序刷题（单选）", lambda: self._start_quiz('sequential', 'single')),
             ("随机刷题（单选）", lambda: self._start_quiz('random', 'single')),
             ("顺序刷题（多选）", lambda: self._start_quiz('sequential', 'multi')),
@@ -69,9 +71,10 @@ class OperationsPage(tk.Frame):
         if bank:
             self.title_label.config(text=bank['name'])
             questions = bank['questions']
+            truefalse = sum(1 for q in questions if q['type'] == 'truefalse')
             single = sum(1 for q in questions if q['type'] == 'single')
             multi = sum(1 for q in questions if q['type'] == 'multi')
-            self.info_label.config(text=f"共 {len(questions)} 题（单选 {single} / 多选 {multi}）")
+            self.info_label.config(text=f"共 {len(questions)} 题（判断 {truefalse} / 单选 {single} / 多选 {multi}）")
 
     def _start_quiz(self, mode, q_type):
         """开始刷题"""

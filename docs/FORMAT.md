@@ -9,6 +9,9 @@
 在 Markdown 文件中使用 `##` 标题来设置后续题目的默认题型：
 
 ```markdown
+## 判断题
+（后续题目默认为 truefalse）
+
 ## 单选题
 （后续题目默认为 single）
 
@@ -17,6 +20,7 @@
 ```
 
 标题匹配规则（宽松匹配，不区分大小写）：
+- 标题文本中包含"判断"或"truefalse" -- 默认题型设为 `truefalse`
 - 标题文本中包含"单选"或"single" -- 默认题型设为 `single`
 - 标题文本中包含"多选"或"multiple" -- 默认题型设为 `multi`
 
@@ -38,6 +42,7 @@ D. 选项D
 ```
 
 支持的注释：
+- `<!-- truefalse -->` -- 强制当前题目为判断
 - `<!-- single -->` -- 强制当前题目为单选
 - `<!-- multi -->` -- 强制当前题目为多选
 
@@ -75,6 +80,18 @@ D. 选项D
 ### 1.4 完整示例
 
 ````markdown
+## 判断题
+
+**1. 实践是检验真理的唯一标准（　）**
+A. 正确
+B. 错误
+
+**答案：A**
+
+**解析：** 这是马克思主义认识论的基本观点。
+
+---
+
 ## 单选题
 
 **1. 毛泽东思想形成和发展的时代条件是（　）**
@@ -130,7 +147,8 @@ meta:
   source_files:
     - "毛概选择题（含解析）.md"
   total: 75
-  single_count: 50
+  truefalse_count: 10
+  single_count: 40
   multi_count: 25
 
 questions:
@@ -158,10 +176,11 @@ questions:
 | updated | string | 是 | 最后更新日期，格式 YYYY-MM-DD |
 | source_files | list | 是 | 导入来源文件名列表 |
 | total | int | 是 | 题目总数 |
+| truefalse_count | int | 是 | 判断题数量 |
 | single_count | int | 是 | 单选题数量 |
 | multi_count | int | 是 | 多选题数量 |
 
-`meta` 中的 `total`、`single_count`、`multi_count` 在每次保存时自动重新计算，无需手动维护。
+`meta` 中的 `total`、`truefalse_count`、`single_count`、`multi_count` 在每次保存时自动重新计算，无需手动维护。
 
 ### 2.3 questions 字段说明
 
@@ -169,10 +188,10 @@ questions:
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| id | int | 是 | 题目编号，同类型内唯一（单选 1-50，多选 1-25） |
-| type | string | 是 | 题型：`"single"` 或 `"multi"` |
+| id | int | 是 | 题目编号，同类型内唯一（判断 1-N，单选 1-N，多选 1-N） |
+| type | string | 是 | 题型：`"truefalse"`、`"single"` 或 `"multi"` |
 | question | string | 是 | 题目文本（不含题号和括号） |
-| options | list | 是 | 4 个选项，格式为 `"X. 文本"` 的字符串列表 |
+| options | list | 是 | 选项列表，判断题 2 个，单选/多选 4 个 |
 | answer | string | 是 | 答案（见下方答案格式规则） |
 | explanation | string | 否 | 解析内容，可为空字符串 |
 | source | string | 否 | 来源文件名 |
@@ -188,11 +207,24 @@ meta:
   updated: "2026-06-28"
   source_files:
     - "毛概选择题（含解析）.md"
-  total: 2
+  total: 3
+  truefalse_count: 1
   single_count: 1
   multi_count: 1
 
 questions:
+  - id: 1
+    type: truefalse
+    question: 实践是检验真理的唯一标准
+    options:
+      - A. 正确
+      - B. 错误
+    answer: A
+    explanation: 这是马克思主义认识论的基本观点。
+    source: 毛概选择题（含解析）.md
+    content_hash: a1b2c3d4
+    flagged: false
+    flag_reason: null
   - id: 1
     type: single
     question: 毛泽东思想形成和发展的时代条件是
@@ -241,17 +273,24 @@ questions:
 
 ### 3.2 题型校验
 
-`type` 字段必须是以下两个值之一：
+`type` 字段必须是以下三个值之一：
 
+- `truefalse` -- 判断题
 - `single` -- 单选题
 - `multi` -- 多选题
 
 ### 3.3 选项校验
 
-- 选项数量必须至少 4 个（A-D）
+- 判断题：必须恰好 2 个选项（A、B）
+- 单选/多选题：必须恰好 4 个选项（A-D）
 - 选项以列表或字典形式存储均可，导入时自动转换
 
 ### 3.4 答案格式校验
+
+**判断题（type: truefalse）：**
+- 答案必须是 A 或 B
+- 示例：`A`、`B`
+- 错误示例：`C`（超出范围）、`AB`（多于一个字母）
 
 **单选题（type: single）：**
 - 答案必须是 A-D 中的恰好一个字母
@@ -277,6 +316,18 @@ questions:
 
 ````markdown
 请按以下 Markdown 格式生成选择题：
+
+## 判断题
+
+**1. 题目文本（　）**
+A. 正确
+B. 错误
+
+**答案：A**
+
+**解析：** 解析内容
+
+---
 
 ## 单选题
 
@@ -307,10 +358,11 @@ D. 选项D
 ---
 
 要求：
-1. 单选题答案为 A-D 中的一个字母
-2. 多选题答案为 2-4 个不重复的 A-D 字母
-3. 每题必须有 4 个选项
-4. 解析要说明正确答案的原因和其他选项的错误
-5. 题号按顺序编号
-6. 用 --- 分隔每道题
+1. 判断题答案为 A 或 B，选项为"正确/错误"
+2. 单选题答案为 A-D 中的一个字母
+3. 多选题答案为 2-4 个不重复的 A-D 字母
+4. 判断题必须有 2 个选项，单选/多选题必须有 4 个选项
+5. 解析要说明正确答案的原因和其他选项的错误
+6. 题号按顺序编号
+7. 用 --- 分隔每道题
 ````

@@ -21,7 +21,7 @@ QUESTIONS_FILE = 'questions.yaml'
 QUESTIONS_FILE_JSON = 'questions.json'
 
 REQUIRED_FIELDS = ['id', 'type', 'question', 'options', 'answer']
-VALID_TYPES = ['single', 'multi']
+VALID_TYPES = ['single', 'multi', 'truefalse']
 
 
 def validate_question(q: Dict) -> List[str]:
@@ -49,12 +49,20 @@ def validate_question(q: Dict) -> List[str]:
         errors.append(f"type 无效: {q['type']}，必须是 {VALID_TYPES}")
 
     # 选项检查
-    if not isinstance(q['options'], dict) or len(q['options']) < 4:
+    if not isinstance(q['options'], dict):
+        errors.append("options 必须是字典格式")
+    elif q['type'] == 'truefalse':
+        if len(q['options']) != 2:
+            errors.append(f"判断题必须有 2 个选项，当前为 {len(q['options'])} 个")
+    elif len(q['options']) < 4:
         errors.append(f"options 不足 4 个，当前为 {len(q.get('options', {}))} 个")
 
     # 答案检查
     answer = q['answer'].upper()
-    if q['type'] == 'single':
+    if q['type'] == 'truefalse':
+        if answer not in ('A', 'B'):
+            errors.append(f"answer 无效: 判断题答案必须是 A 或 B，当前为 \"{q['answer']}\"")
+    elif q['type'] == 'single':
         if len(answer) != 1 or answer not in 'ABCD':
             errors.append(f"answer 无效: 单选答案必须是 A-D 中的一个字母，当前为 \"{q['answer']}\"")
     elif q['type'] == 'multi':
@@ -128,7 +136,8 @@ def load_questions() -> Dict:
             'source_files': [],
             'total': 0,
             'single_count': 0,
-            'multi_count': 0
+            'multi_count': 0,
+            'truefalse_count': 0
         },
         'questions': []
     }
@@ -146,6 +155,7 @@ def save_questions(data: Dict) -> None:
     data['meta']['total'] = len(data['questions'])
     data['meta']['single_count'] = sum(1 for q in data['questions'] if q['type'] == 'single')
     data['meta']['multi_count'] = sum(1 for q in data['questions'] if q['type'] == 'multi')
+    data['meta']['truefalse_count'] = sum(1 for q in data['questions'] if q['type'] == 'truefalse')
 
     if HAS_YAML:
         with open(QUESTIONS_FILE, 'w', encoding='utf-8') as f:
@@ -310,6 +320,7 @@ def cmd_stats(args):
     print(f"题库统计")
     print(f"{'='*40}")
     print(f"总题数: {meta.get('total', len(questions))}")
+    print(f"判断题: {meta.get('truefalse_count', 0)}")
     print(f"单选题: {meta.get('single_count', 0)}")
     print(f"多选题: {meta.get('multi_count', 0)}")
     print(f"标记待处理: {sum(1 for q in questions if q.get('flagged'))}")
@@ -366,7 +377,7 @@ def cmd_export(args):
     for q in sorted(questions, key=lambda x: (x['type'], x.get('id', 0))):
         if q['type'] != current_type:
             current_type = q['type']
-            type_name = '单选题' if current_type == 'single' else '多选题'
+            type_name = '判断题' if current_type == 'truefalse' else ('单选题' if current_type == 'single' else '多选题')
             lines.append(f"\n## {type_name}\n")
 
         lines.append(f"**{q.get('id', '?')}. {q['question']}**")
@@ -418,7 +429,7 @@ def main():
     # unflag 命令
     unflag_parser = subparsers.add_parser('unflag', help='取消标记')
     unflag_parser.add_argument('--id', type=int, required=True, help='题目 ID')
-    unflag_parser.add_argument('--type', choices=['single', 'multi'], help='题目类型')
+    unflag_parser.add_argument('--type', choices=['single', 'multi', 'truefalse'], help='题目类型')
 
     # export 命令
     export_parser = subparsers.add_parser('export', help='导出为 Markdown')

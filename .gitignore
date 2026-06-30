@@ -28,6 +28,7 @@ dist/
 # ─── 工具和编辑器 ───
 # Claude Code 的项目级配置和记忆文件
 .claude/
+CLAUDE.md
 # Superpowers 开发工具的工作文件
 .superpowers/
 # Superpowers 生成的设计文档和计划
@@ -36,3 +37,6 @@ docs/superpowers/
 .pytest_cache/
 # Python 打包元数据（setuptools 生成）
 *.egg-info/
+
+# ─── 已废弃的终端版本 ───
+legacy/

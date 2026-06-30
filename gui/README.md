@@ -1,6 +1,6 @@
 # GUI 版本 — 开发说明
 
-基于 tkinter 的桌面图形界面，复用终端版的全部业务逻辑。
+基于 tkinter 的桌面图形界面，QuizVault 的唯一活跃版本。
 
 ## 运行
 
@@ -31,7 +31,7 @@ gui/
 │   ├── flagged.py       # 标记题目页
 │   └── batch_delete.py  # 批量删题页
 └── widgets/
-    └── question_card.py # 题目展示组件（单选/复选/解析）
+    └── question_card.py # 题目展示组件（单选/复选/判断）
 ```
 
 ## 页面路由
@@ -48,19 +48,21 @@ bank_select → operations → quiz → result
 
 每个页面是一个 `tk.Frame` 子类，通过 `controller.show_frame(PageClass)` 切换。
 
-## 与终端版的关系
+## 题型支持
 
-- 两个版本并存，互不干扰
-- 共享 `bank_manager.py`（题库扫描、错题/收藏/标记 CRUD）
-- 共享 `parse_markdown.py`（Markdown 解析）
-- 共享 `banks/` 文件夹中的题库数据
-- 错题本、收藏夹等数据互通
+支持三种题型：
+
+| 题型 | type 值 | 选项数量 | 答案格式 |
+|------|---------|----------|----------|
+| 判断题 | truefalse | 2 个 | A 或 B |
+| 单选题 | single | 4 个 | A-D 中一个 |
+| 多选题 | multi | 4 个 | 2-4 个不重复字母 |
 
 ## 快捷键
 
 | 按键 | 功能 |
 |------|------|
-| A/B/C/D | 选择选项 |
+| A/B/C/D | 选择选项（判断题只响应 A/B） |
 | Enter | 提交答案 |
 | Space | 下一题 |
 | F | 标记题目 |

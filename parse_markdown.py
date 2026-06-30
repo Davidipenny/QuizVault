@@ -35,6 +35,8 @@ def parse_markdown(text: str) -> List[Dict]:
                 current_type = 'single'
             elif '多选' in header_text or 'multiple' in header_text:
                 current_type = 'multi'
+            elif '判断' in header_text or 'truefalse' in header_text:
+                current_type = 'truefalse'
             # 跳过纯标题块（没有题目的块）
             if not re.search(r'\*\*\d+\.', block):
                 continue
@@ -48,6 +50,8 @@ def parse_markdown(text: str) -> List[Dict]:
             current_type = 'single'
         elif '<!-- multi -->' in block:
             current_type = 'multi'
+        elif '<!-- truefalse -->' in block:
+            current_type = 'truefalse'
 
         # 匹配题号和题干
         # 允许（　）后有文本，如 "（　）中首先确立的。"

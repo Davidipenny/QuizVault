@@ -50,13 +50,30 @@ class QuestionCard(tk.Frame):
         self.selected_answer.set('')
         self.check_vars = {}
         self._locked = False
+        self._question_type = q['type']
 
         # 题干
-        type_tag = "【单选】" if q['type'] == 'single' else "【多选】"
+        type_tags = {
+            'single': '【单选】',
+            'multi': '【多选】',
+            'truefalse': '【判断】',
+        }
+        type_tag = type_tags.get(q['type'], '【单选】')
         self.question_label.config(text=f"{type_tag} {q['question']}")
 
         # 选项
-        if q['type'] == 'single':
+        if q['type'] == 'truefalse':
+            # 判断题：垂直排列
+            for letter in sorted(q['options'].keys()):
+                rb = tk.Radiobutton(
+                    self.options_frame,
+                    text=f"{letter}. {q['options'][letter]}",
+                    variable=self.selected_answer, value=letter,
+                    font=("Microsoft YaHei", 11), anchor=tk.W,
+                )
+                rb.pack(fill=tk.X, pady=2)
+                self.option_widgets.append(rb)
+        elif q['type'] == 'single':
             for letter in ['A', 'B', 'C', 'D']:
                 if letter in q['options']:
                     rb = tk.Radiobutton(
@@ -125,10 +142,14 @@ class QuestionCard(tk.Frame):
         """
         if self._locked:
             return
+        # 判断题只接受 A/B
+        if hasattr(self, '_question_type') and self._question_type == 'truefalse':
+            if letter not in ('A', 'B'):
+                return
         if self.check_vars:  # 多选 - 切换
             if letter in self.check_vars:
                 self.check_vars[letter].set(not self.check_vars[letter].get())
-        else:  # 单选
+        else:  # 单选/判断
             self.selected_answer.set(letter)
 
     def _clear_options(self):
