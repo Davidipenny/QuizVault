@@ -58,6 +58,7 @@ class WrongBookPage(tk.Frame):
             return
         self.app.quiz_questions = questions
         self.app.quiz_mode = 'sequential'
+        self.app.quiz_type = 'all'
         self.app.show_page('quiz')
 
     def _create_book(self):

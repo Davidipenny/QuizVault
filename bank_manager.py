@@ -39,8 +39,9 @@ def scan_banks_folder(banks_dir: str = 'banks') -> List[Dict]:
 
 
 def _load_bank_questions(bank_path: str) -> List[Dict]:
-    """加载单个题库文件夹的所有题目（过滤已删除的）"""
+    """加载单个题库文件夹的所有题目（过滤已删除的，去重）"""
     questions = []
+    seen_texts = set()  # (question_text, type) 去重
     for filename in sorted(os.listdir(bank_path)):
         filepath = os.path.join(bank_path, filename)
         if not os.path.isfile(filepath):
@@ -52,8 +53,12 @@ def _load_bank_questions(bank_path: str) -> List[Dict]:
                     content = f.read()
                 parsed = parse_markdown(content)
                 for q in parsed:
+                    key = (q['question'], q['type'])
+                    if key in seen_texts:
+                        continue
+                    seen_texts.add(key)
                     q['source'] = filename
-                questions.extend(parsed)
+                    questions.append(q)
             except Exception as e:
                 print(f"Warning: failed to parse {filename}: {e}")
 
@@ -69,7 +74,11 @@ def _load_bank_questions(bank_path: str) -> List[Dict]:
                 for q in loaded:
                     if 'source' not in q:
                         q['source'] = filename
-                questions.extend(loaded)
+                    key = (q.get('question', ''), q.get('type', ''))
+                    if key in seen_texts:
+                        continue
+                    seen_texts.add(key)
+                    questions.append(q)
             except (json.JSONDecodeError, IOError) as e:
                 print(f"Warning: failed to parse {filename}: {e}")
 

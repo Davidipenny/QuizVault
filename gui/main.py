@@ -69,6 +69,18 @@ class App(tk.Tk):
         self.pages['bank_select'].pack(fill=tk.BOTH, expand=True)
         self.current_page = self.pages['bank_select']
 
+        # 窗口关闭时保存刷题进度
+        self.protocol("WM_DELETE_WINDOW", self._on_closing)
+
+    def _on_closing(self):
+        """窗口关闭时保存当前进度"""
+        try:
+            if self.current_page is self.pages.get('quiz'):
+                self.current_page._save_progress()
+        except Exception:
+            pass  # 保存进度失败不应阻止窗口关闭
+        self.destroy()
+
     def show_page(self, page_name: str):
         """切换到指定页面"""
         if self.current_page:

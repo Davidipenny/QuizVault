@@ -81,6 +81,9 @@ def parse_markdown(text: str) -> List[Dict]:
         answer_match = re.search(r'\*\*答案：([A-D]+)\*\*', block)
         if answer_match and current_question:
             current_question['answer'] = answer_match.group(1)
+            # 自动检测：如果答案是多个字母但当前类型为single，纠正为multi
+            if len(current_question['answer']) > 1 and current_question['type'] == 'single':
+                current_question['type'] = 'multi'
 
         # 匹配解析
         explanation_match = re.search(r'\*\*解析：\*\*\s*(.+?)(?=\n---|\n##|$)', block, re.DOTALL)

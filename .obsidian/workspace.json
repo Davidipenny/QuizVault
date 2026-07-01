@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "gui/README.md",
+                "file": "banks/毛概往年题/2020春wh.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "README"
+              "title": "2020春wh"
             }
           }
         ]
@@ -185,6 +185,7 @@
   },
   "active": "c98ee52e36238196",
   "lastOpenFiles": [
-    "README.md"
+    "README.md",
+    "gui/README.md"
   ]
 }

@@ -160,6 +160,7 @@ class CollectionDetailPage(tk.Frame):
             return
         self.app.quiz_questions = questions
         self.app.quiz_mode = mode
+        self.app.quiz_type = 'all'
         self.app.show_page('quiz')
 
     def _rename(self):

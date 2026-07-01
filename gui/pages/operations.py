@@ -106,5 +106,6 @@ class OperationsPage(tk.Frame):
 
         self.app.quiz_questions = questions
         self.app.quiz_mode = mode
+        self.app.quiz_type = q_type
         self.app.quiz_resume_data = resume_data
         self.app.show_page('quiz')
