@@ -102,6 +102,10 @@ class QuizPage(tk.Frame):
                         if q['id'] == wr['id'] and q['type'] == wr['type']:
                             self.wrong_questions.append(q)
                             break
+            # 恢复作答历史
+            self.answers = {
+                i: a for i, a in enumerate(resume_data.get('answers', []))
+            }
         else:
             if self.app.quiz_mode == 'random':
                 indices = list(range(len(self.questions)))
@@ -293,6 +297,7 @@ class QuizPage(tk.Frame):
             'correct_count': self.correct_count,
             'wrong_questions': [{'id': q['id'], 'type': q['type']} for q in self.wrong_questions],
             'question_order': getattr(self, '_shuffle_order', None),
+            'answers': list(self.answers.values()),
             'saved_at': datetime.now().isoformat()
         }
         save_quiz_progress(bank['path'], progress)
