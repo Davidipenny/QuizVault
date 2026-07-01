@@ -208,13 +208,22 @@ class QuizPage(tk.Frame):
 
     def _next(self):
         """下一题"""
-        if not self.answered:
-            return
-        self.current_idx += 1
-        if self.current_idx >= len(self.questions):
-            self._show_result()
+        if self.current_idx in self.answers:
+            # 回顾模式：始终可以前进
+            self.current_idx += 1
+            if self.current_idx >= len(self.questions):
+                self._show_result()
+            else:
+                self._show_question()
         else:
-            self._show_question()
+            # 答题模式：必须先提交
+            if not self.answered:
+                return
+            self.current_idx += 1
+            if self.current_idx >= len(self.questions):
+                self._show_result()
+            else:
+                self._show_question()
 
     def _prev(self):
         """上一题（回顾）"""
