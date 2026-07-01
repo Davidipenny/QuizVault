@@ -266,10 +266,19 @@ class QuizPage(tk.Frame):
         if not bank or not self.questions:
             return
 
+        # 判断题型
+        types = set(q['type'] for q in self.questions)
+        if types == {'single'}:
+            question_type = 'single'
+        elif types == {'multi'}:
+            question_type = 'multi'
+        else:
+            question_type = 'all'
+
         progress = {
             'bank_name': bank['name'],
             'mode': self.app.quiz_mode,
-            'question_type': getattr(self.app, 'quiz_type', 'all'),
+            'question_type': question_type,
             'total_questions': len(self.questions),
             'current_idx': self.current_idx,
             'correct_count': self.correct_count,
