@@ -104,7 +104,7 @@ class QuizPage(tk.Frame):
                             break
             # 恢复作答历史
             self.answers = {
-                i: a for i, a in enumerate(resume_data.get('answers', []))
+                i: a for i, a in enumerate(resume_data.get('answers', [])) if a is not None
             }
         else:
             if self.app.quiz_mode == 'random':
@@ -312,10 +312,10 @@ class QuizPage(tk.Frame):
 
     def _on_return(self, event):
         """Enter 键"""
-        if not self.answered:
-            self._submit()
-        else:
+        if self.current_idx in self.answers or self.answered:
             self._next()
+        else:
+            self._submit()
 
     def _on_space(self, event):
         """空格键"""

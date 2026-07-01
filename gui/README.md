@@ -66,6 +66,7 @@ bank_select → operations → quiz → result
 | Enter | 提交答案 |
 | Space | 下一题 |
 | F | 标记题目 |
+| ←/→ | 上一题/下一题（回顾已答题目） |
 | Esc | 返回上一页 |
 
 ## 依赖

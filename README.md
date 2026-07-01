@@ -8,8 +8,7 @@
 
 **无需安装 Python，下载解压即用。**
 
-前往 [GitHub Releases](https://github.com/Davidipenny/QuizVault/releases/latest) 下载 `QuizVault-GUI.zip`，解压后双击 `quiz_gui.exe` 即可。
-
+前往 [GitHub Releases](https://github.com/Davidipenny/QuizVault/releases/latest) 下载 `QuizVault-GUI.zip`，解压后双击 `quiz_gui.exe` 即可。（说明：v1.2版本会出现题型识别错误，请先下载v1.0版本使用，等考完就修复）
 <!-- 截图放在这里 -->
 <!-- ![GUI 截图](docs/screenshot.png) -->
 
@@ -100,6 +99,7 @@ D. 因果规律
 | 标记题目 | 刷题时按 `F` 标记有疑问的题目，后续统一处理 |
 | 进度保存 | 中途退出自动保存，下次可继续或重新开始 |
 | 批量删题 | 勾选式批量删除不需要的题目 |
+| 刷题回顾 | 答题过程中可按 ← 上一题/下一题 → 翻阅已答题目，查看答案和解析 |
 | 快捷键 | A/B/C/D 选择，Enter 提交，Space 下一题，F 标记 |
 
 ## 常见问题
