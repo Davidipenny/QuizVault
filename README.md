@@ -8,7 +8,7 @@
 
 **无需安装 Python，下载解压即用。**
 
-前往 [GitHub Releases](https://github.com/Davidipenny/QuizVault/releases/latest) 下载 `QuizVault-GUI.zip`，解压后双击 `quiz_gui.exe` 即可。（说明：v1.2版本会出现题型识别错误，请先下载v1.0版本使用，等考完就修复）
+前往 [GitHub Releases](https://github.com/Davidipenny/QuizVault/releases/latest) 下载 `QuizVault-GUI-v1.3.zip`，解压后双击 `quiz_gui.exe` 即可。
 <!-- 截图放在这里 -->
 <!-- ![GUI 截图](docs/screenshot.png) -->
 
