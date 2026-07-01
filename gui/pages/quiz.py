@@ -31,6 +31,7 @@ class QuizPage(tk.Frame):
         self.correct_count = 0
         self.wrong_questions = []
         self.answered = False
+        self.answers = {}  # {index: answer_snapshot}
         self._build_ui()
 
     def _build_ui(self):
@@ -64,6 +65,9 @@ class QuizPage(tk.Frame):
         # 返回按钮
         self.back_btn = tk.Button(self.bottom_frame, text="← 返回", command=self._save_and_go_back, font=("Microsoft YaHei", 10))
         self.back_btn.pack(side=tk.LEFT)
+
+        # 上一题按钮（回顾）
+        self.prev_btn = tk.Button(self.bottom_frame, text="← 上一题", command=self._prev, font=("Microsoft YaHei", 10))
 
         # 快捷键 - 绑定到本 frame，refresh 时获取焦点
         self.bind('<Return>', self._on_return)
@@ -109,13 +113,13 @@ class QuizPage(tk.Frame):
             self.current_idx = 0
             self.correct_count = 0
             self.wrong_questions = []
+            self.answers = {}
 
         self.answered = False
         self._show_question()
 
     def _show_question(self):
         """显示当前题目"""
-        self.answered = False
         q = self.questions[self.current_idx]
 
         # 来源
@@ -128,9 +132,39 @@ class QuizPage(tk.Frame):
         # 加载题目到卡片
         self.card.load_question(q)
 
-        # 显示/隐藏按钮
+        # 判断模式：已答题 → 回顾模式，否则 → 答题模式
+        if self.current_idx in self.answers:
+            self._show_review_question()
+        else:
+            self._show_active_question()
+
+    def _show_review_question(self):
+        """以回顾模式显示当前已答题（只读）"""
+        q = self.questions[self.current_idx]
+        ans = self.answers[self.current_idx]
+
+        # 还原用户选择的答案
+        user_ans = ans['user_answer']
+        if q['type'] == 'multi':
+            for letter in user_ans:
+                self.card.select_option(letter)
+        else:
+            self.card.select_option(user_ans)
+
+        self.card.lock_options()
+        self.card.show_feedback(ans['is_correct'], ans['correct_answer'], ans['explanation'])
+
+        # 按钮控制
+        self.submit_btn.pack_forget()
+        self.prev_btn.pack(side=tk.LEFT) if self.current_idx > 0 else self.prev_btn.pack_forget()
+        self.next_btn.pack(side=tk.RIGHT)
+
+    def _show_active_question(self):
+        """以答题模式显示当前未答题"""
+        self.answered = False
         self.submit_btn.pack(pady=10)
         self.next_btn.pack_forget()
+        self.prev_btn.pack(side=tk.LEFT) if self.answers else self.prev_btn.pack_forget()
 
     def _submit(self):
         """提交答案"""
@@ -145,6 +179,14 @@ class QuizPage(tk.Frame):
 
         self.answered = True
         self.submit_btn.pack_forget()
+
+        # 存储作答记录
+        self.answers[self.current_idx] = {
+            'user_answer': user_answer,
+            'is_correct': is_correct,
+            'correct_answer': correct_answer,
+            'explanation': q.get('explanation', ''),
+        }
 
         # 显示反馈
         explanation = q.get('explanation', '')
@@ -172,6 +214,12 @@ class QuizPage(tk.Frame):
         if self.current_idx >= len(self.questions):
             self._show_result()
         else:
+            self._show_question()
+
+    def _prev(self):
+        """上一题（回顾）"""
+        if self.current_idx > 0:
+            self.current_idx -= 1
             self._show_question()
 
     def _show_result(self):
@@ -218,19 +266,10 @@ class QuizPage(tk.Frame):
         if not bank or not self.questions:
             return
 
-        # 判断题型
-        types = set(q['type'] for q in self.questions)
-        if types == {'single'}:
-            question_type = 'single'
-        elif types == {'multi'}:
-            question_type = 'multi'
-        else:
-            question_type = 'all'
-
         progress = {
             'bank_name': bank['name'],
             'mode': self.app.quiz_mode,
-            'question_type': question_type,
+            'question_type': getattr(self.app, 'quiz_type', 'all'),
             'total_questions': len(self.questions),
             'current_idx': self.current_idx,
             'correct_count': self.correct_count,
