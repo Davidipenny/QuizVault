@@ -15,8 +15,8 @@ banks/*/collections.json
 banks/*/quiz_progress.json
 # 标记题目：刷题时按 F 标记的待修改题目
 banks/*/flagged.json
-# 批量删除备份：批量删题时自动备份的已删除题目
-banks/*/deleted_questions.json
+# 删除记录：标记为已删除的题目（source 文件保留）
+banks/*/deleted.json
 
 # ─── PyInstaller 打包产物 ───
 # 打包过程中的中间文件

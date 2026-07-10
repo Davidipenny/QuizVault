@@ -20,13 +20,15 @@ class BatchDeletePage(tk.Frame):
         self._build_ui()
 
     def _build_ui(self):
-        tk.Label(self, text="批量删题", font=("Microsoft YaHei", 16, "bold")).pack(pady=15)
+        tk.Label(self, text="批量删题", font=self.app.get_font(16, bold=True)).pack(pady=15)
 
         # 全选/取消
         ctrl_frame = tk.Frame(self)
         ctrl_frame.pack(fill=tk.X, padx=20)
-        tk.Button(ctrl_frame, text="全选", command=self._select_all, width=8).pack(side=tk.LEFT)
-        tk.Button(ctrl_frame, text="取消全选", command=self._select_none, width=8).pack(side=tk.LEFT, padx=5)
+        tk.Button(ctrl_frame, text="全选", command=self._select_all, width=8,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT)
+        tk.Button(ctrl_frame, text="取消全选", command=self._select_none, width=8,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
 
         # 题目列表（带复选框）
         list_frame = tk.Frame(self)
@@ -46,8 +48,10 @@ class BatchDeletePage(tk.Frame):
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=10)
-        tk.Button(btn_frame, text="确认删除", command=self._delete_selected, width=12, fg="red").pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="返回", command=lambda: self.app.show_page('operations'), width=12).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="确认删除", command=self._delete_selected, width=12, fg="red",
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="返回", command=lambda: self.app.show_page('operations'), width=12,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
 
     def refresh(self):
         for w in self.scrollable_frame.winfo_children():
@@ -60,7 +64,8 @@ class BatchDeletePage(tk.Frame):
             self.check_vars.append((var, q))
             qtype = "单选" if q['type'] == 'single' else "多选"
             text = f"{i+1}. [{qtype}] {q['question'][:50]}"
-            cb = tk.Checkbutton(self.scrollable_frame, text=text, variable=var, anchor=tk.W, font=("Microsoft YaHei", 10))
+            cb = tk.Checkbutton(self.scrollable_frame, text=text, variable=var, anchor=tk.W,
+                                font=self.app.get_font(10))
             cb.pack(fill=tk.X, pady=1)
             cb.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
 

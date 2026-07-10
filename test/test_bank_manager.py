@@ -21,6 +21,7 @@ from bank_manager import (
     rename_bank_collection,
     add_to_bank_collection,
     remove_from_bank_collection,
+    get_collection_names,
     load_bank_flagged,
     add_to_bank_flagged,
     remove_from_bank_flagged,
@@ -379,7 +380,13 @@ def test_save_bank_collection():
 
         result = load_bank_collections(tmpdir)
         assert "测试收藏" in result["collections"]
-        assert len(result["collections"]["测试收藏"]) == 1
+        val = result["collections"]["测试收藏"]
+        assert isinstance(val, dict)
+        assert "created" in val
+        assert "questions" in val
+        assert len(val["questions"]) == 1
+        assert val["questions"][0]["id"] == 1
+        assert val["questions"][0]["type"] == "single"
 
 
 # --- remove_bank_wrong_question tests ---
@@ -1041,3 +1048,122 @@ def test_save_load_delete_roundtrip():
         # 删除
         assert delete_quiz_progress(tmpdir) is True
         assert load_quiz_progress(tmpdir) is None
+
+
+# --- collection format migration tests ---
+
+def test_save_bank_collection_dict_format():
+    """save_bank_collection 创建 dict 格式，含 created/questions 键"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        question = {
+            "id": 1, "type": "single", "question": "题1",
+            "options": {"A": "A", "B": "B"}, "answer": "A", "explanation": ""
+        }
+        save_bank_collection(tmpdir, "测试", question)
+        data = load_bank_collections(tmpdir)
+        val = data["collections"]["测试"]
+        assert isinstance(val, dict)
+        assert "created" in val
+        assert "questions" in val
+        assert len(val["questions"]) == 1
+        assert val["questions"][0]["id"] == 1
+
+
+def test_save_bank_collection_migrates_old_list():
+    """save_bank_collection 自动迁移旧 list 格式到 dict 格式"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        raw = {"collections": {"old": [{"id": 1, "type": "single", "question": "x", "options": {}, "answer": "A", "explanation": ""}]}}
+        with open(os.path.join(tmpdir, 'collections.json'), 'w', encoding='utf-8') as f:
+            json.dump(raw, f, ensure_ascii=False)
+        save_bank_collection(tmpdir, "old", {"id": 2, "type": "multi", "question": "y", "options": {}, "answer": "AB", "explanation": ""})
+        data = load_bank_collections(tmpdir)
+        val = data["collections"]["old"]
+        assert isinstance(val, dict)
+        assert len(val["questions"]) == 2
+        assert val["questions"][0]["id"] == 1
+        assert val["questions"][1]["id"] == 2
+
+
+def test_add_to_bank_collection_auto_migrates_list():
+    """add_to_bank_collection 自动将旧 list 转为 dict 格式"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        raw = {"collections": {"oldlist": [{"id": 1, "type": "single"}]}}
+        with open(os.path.join(tmpdir, 'collections.json'), 'w', encoding='utf-8') as f:
+            json.dump(raw, f, ensure_ascii=False)
+        result = add_to_bank_collection(tmpdir, "oldlist", 2, "multi")
+        assert result is True
+        data = load_bank_collections(tmpdir)
+        val = data["collections"]["oldlist"]
+        assert isinstance(val, dict)
+        assert len(val["questions"]) == 2
+
+
+def test_remove_from_bank_collection_auto_migrates_list():
+    """remove_from_bank_collection 自动将旧 list 转为 dict 格式"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        raw = {"collections": {"oldlist": [{"id": 1, "type": "single"}]}}
+        with open(os.path.join(tmpdir, 'collections.json'), 'w', encoding='utf-8') as f:
+            json.dump(raw, f, ensure_ascii=False)
+        result = remove_from_bank_collection(tmpdir, "oldlist", 1, "single")
+        assert result is True
+        data = load_bank_collections(tmpdir)
+        val = data["collections"]["oldlist"]
+        assert isinstance(val, dict)
+        assert len(val["questions"]) == 0
+
+
+def test_get_collection_names():
+    """get_collection_names 返回排序的名称列表"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        create_bank_collection(tmpdir, "B收藏")
+        create_bank_collection(tmpdir, "A收藏")
+        names = get_collection_names(tmpdir)
+        assert names == ["A收藏", "B收藏"]
+
+
+def test_get_collection_names_empty():
+    """get_collection_names 无收藏夹时返回空列表"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        names = get_collection_names(tmpdir)
+        assert names == []
+
+
+# --- wrong count tests ---
+
+def test_wrong_count_cumulative():
+    """同一错题重复保存时 wrong_count 累加，唯一题数不变"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        q = {"id": 1, "type": "single", "question": "x", "options": {}, "answer": "A", "explanation": ""}
+        save_bank_wrong_question(tmpdir, "test", q)
+        save_bank_wrong_question(tmpdir, "test", q)
+        save_bank_wrong_question(tmpdir, "test", q)
+        data = load_bank_wrong_questions(tmpdir)
+        entry = data["wrong_books"]["test"][0]
+        assert entry["wrong_count"] == 3
+        assert len(data["wrong_books"]["test"]) == 1
+
+
+def test_wrong_count_accumulates_across_books():
+    """同一题目在不同错题本中各自独立计数"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        q = {"id": 1, "type": "single", "question": "x", "options": {}, "answer": "A", "explanation": ""}
+        save_bank_wrong_question(tmpdir, "book_a", q)
+        save_bank_wrong_question(tmpdir, "book_a", q)
+        save_bank_wrong_question(tmpdir, "book_b", q)
+        data = load_bank_wrong_questions(tmpdir)
+        assert data["wrong_books"]["book_a"][0]["wrong_count"] == 2
+        assert data["wrong_books"]["book_b"][0]["wrong_count"] == 1
+        assert len(data["wrong_books"]) == 2
+
+
+def test_wrong_count_unique_and_total():
+    """验证唯一题数和累计错误次数的关系"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for i in range(1, 4):
+            q = {"id": i, "type": "single", "question": f"q{i}", "options": {}, "answer": "A", "explanation": ""}
+            save_bank_wrong_question(tmpdir, "test", q)
+            save_bank_wrong_question(tmpdir, "test", q)  # 每道题错两次
+        data = load_bank_wrong_questions(tmpdir)
+        assert len(data["wrong_books"]["test"]) == 3  # 3 道唯一题
+        total_wrong = sum(q.get("wrong_count", 1) for q in data["wrong_books"]["test"])
+        assert total_wrong == 6  # 累计 6 次错误

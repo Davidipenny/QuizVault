@@ -69,6 +69,17 @@ bank_select → operations → quiz → result
 | ←/→ | 上一题/下一题（回顾已答题目） |
 | Esc | 返回上一页 |
 
+## 特殊功能
+
+### 字体缩放
+操作页提供 A+ / A− 按钮可调节全局字体大小（0.6x ~ 2.0x），缩放应用于所有页面和 QuestionCard 组件。实现在 `main.py` 的 `App` 类中，通过 `get_font(base_size)` 方法在各页面统一调用。
+
+### 滚动刷题布局
+`quiz.py` 的刷题页使用 Canvas + Scrollbar 包装题目卡片，确保提交按钮和底部操作栏始终可见。长题干、多选项或长解析可通过鼠标滚轮滚动查看。
+
+### 收藏夹格式兼容
+`bank_manager.py` 统一使用 dict 格式（`{"created": ..., "questions": [...]}`）存储收藏夹数据。旧 list 格式在首次修改时自动迁移，`_get_collection_questions()` 兼容两种格式用于显示。
+
 ## 依赖
 
 零外部依赖，仅使用 Python 标准库（tkinter）。

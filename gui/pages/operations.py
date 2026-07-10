@@ -19,10 +19,18 @@ class OperationsPage(tk.Frame):
         self._build_ui()
 
     def _build_ui(self):
-        self.title_label = tk.Label(self, font=("Microsoft YaHei", 16, "bold"))
+        self.title_label = tk.Label(self, font=self.app.get_font(16, bold=True))
         self.title_label.pack(pady=15)
 
-        self.info_label = tk.Label(self, font=("Microsoft YaHei", 11))
+        # 字体调节按钮
+        font_frame = tk.Frame(self)
+        font_frame.pack(pady=(0, 5))
+        tk.Button(font_frame, text="A−", command=self._decrease_font,
+                  width=4, font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
+        tk.Button(font_frame, text="A+", command=self._increase_font,
+                  width=4, font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
+
+        self.info_label = tk.Label(self, font=self.app.get_font(11))
         self.info_label.pack(pady=5)
 
         # 功能按钮（可滚动区域）
@@ -62,19 +70,53 @@ class OperationsPage(tk.Frame):
             ("返回题库选择", lambda: self.app.show_page('bank_select')),
         ]
 
+        self._btn_frame = btn_frame
+        self._rebuild_buttons(buttons)
+
+    def _rebuild_buttons(self, buttons):
+        """（重新）创建功能按钮，使用当前字体大小"""
+        for w in self._btn_frame.winfo_children():
+            w.destroy()
         for text, cmd in buttons:
-            tk.Button(btn_frame, text=text, command=cmd, width=20, font=("Microsoft YaHei", 10)).pack(pady=3)
+            tk.Button(self._btn_frame, text=text, command=cmd, width=20,
+                      font=self.app.get_font(10)).pack(pady=3)
+
+    def _increase_font(self):
+        self.app.increase_font()
+        self.refresh()
+
+    def _decrease_font(self):
+        self.app.decrease_font()
+        self.refresh()
 
     def refresh(self):
         """刷新页面信息"""
         bank = self.app.selected_bank
         if bank:
-            self.title_label.config(text=bank['name'])
+            self.title_label.config(text=bank['name'], font=self.app.get_font(16, bold=True))
+            self.info_label.config(font=self.app.get_font(11))
             questions = bank['questions']
             truefalse = sum(1 for q in questions if q['type'] == 'truefalse')
             single = sum(1 for q in questions if q['type'] == 'single')
             multi = sum(1 for q in questions if q['type'] == 'multi')
             self.info_label.config(text=f"共 {len(questions)} 题（判断 {truefalse} / 单选 {single} / 多选 {multi}）")
+        # 刷新按钮字体
+        buttons_data = [
+            ("顺序刷题（判断）", lambda: self._start_quiz('sequential', 'truefalse')),
+            ("随机刷题（判断）", lambda: self._start_quiz('random', 'truefalse')),
+            ("顺序刷题（单选）", lambda: self._start_quiz('sequential', 'single')),
+            ("随机刷题（单选）", lambda: self._start_quiz('random', 'single')),
+            ("顺序刷题（多选）", lambda: self._start_quiz('sequential', 'multi')),
+            ("随机刷题（多选）", lambda: self._start_quiz('random', 'multi')),
+            ("顺序刷题（全部）", lambda: self._start_quiz('sequential', 'all')),
+            ("随机刷题（全部）", lambda: self._start_quiz('random', 'all')),
+            ("错题回顾", lambda: self.app.show_page('wrong_book')),
+            ("收藏夹管理", lambda: self.app.show_page('collection')),
+            ("标记题目", lambda: self.app.show_page('flagged')),
+            ("批量删题", lambda: self.app.show_page('batch_delete')),
+            ("返回题库选择", lambda: self.app.show_page('bank_select')),
+        ]
+        self._rebuild_buttons(buttons_data)
 
     def _start_quiz(self, mode, q_type):
         """开始刷题"""

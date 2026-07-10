@@ -2,22 +2,73 @@
 """刷题页"""
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 import random
 import sys
 import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from bank_manager import (
+    create_bank_collection,
+    add_to_bank_collection,
+    get_collection_names,
     save_bank_wrong_question,
     remove_bank_wrong_question,
-    save_bank_collection,
     save_quiz_progress,
+    delete_quiz_progress,
     add_to_bank_flagged,
 )
 from datetime import datetime
 
 from widgets.question_card import QuestionCard
+
+
+class CollectionPickerDialog(tk.Toplevel):
+    """收藏夹选择对话框 — 可选已有收藏夹或输入新名称"""
+
+    def __init__(self, parent, existing_names):
+        super().__init__(parent)
+        self.result = None
+        self.title("收藏")
+        self.geometry("400x300")
+        self.transient(parent)
+        self.grab_set()
+
+        tk.Label(self, text="选择已有收藏夹或输入新名称：", font=("Microsoft YaHei", 10)).pack(pady=5)
+
+        # 已有收藏夹列表
+        self.listbox = tk.Listbox(self, font=("Microsoft YaHei", 11), height=8)
+        for name in existing_names:
+            self.listbox.insert(tk.END, name)
+        self.listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        self.listbox.bind('<Double-1>', lambda e: self._pick_selected())
+
+        # 新名称输入
+        self.entry = tk.Entry(self, font=("Microsoft YaHei", 11))
+        self.entry.pack(fill=tk.X, padx=10, pady=5)
+        self.entry.bind('<Return>', lambda e: self._confirm())
+
+        # 按钮
+        btn_frame = tk.Frame(self)
+        btn_frame.pack(pady=5)
+        tk.Button(btn_frame, text="确定", command=self._confirm, width=8).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="取消", command=self.destroy, width=8).pack(side=tk.LEFT, padx=5)
+
+        self.wait_window()
+
+    def _pick_selected(self):
+        sel = self.listbox.curselection()
+        if sel:
+            self.result = self.listbox.get(sel[0])
+            self.destroy()
+
+    def _confirm(self):
+        name = self.entry.get().strip()
+        if name:
+            self.result = name
+            self.destroy()
+        else:
+            self._pick_selected()
 
 
 class QuizPage(tk.Frame):
@@ -38,36 +89,62 @@ class QuizPage(tk.Frame):
         # 顶栏：来源 + 进度
         self.header_frame = tk.Frame(self)
         self.header_frame.pack(fill=tk.X, padx=10, pady=5)
-        self.source_label = tk.Label(self.header_frame, font=("Microsoft YaHei", 9), fg="gray")
+        self.source_label = tk.Label(self.header_frame, font=self.app.get_font(9), fg="gray")
         self.source_label.pack(side=tk.LEFT)
-        self.progress_label = tk.Label(self.header_frame, font=("Microsoft YaHei", 9))
+        self.progress_label = tk.Label(self.header_frame, font=self.app.get_font(9))
         self.progress_label.pack(side=tk.RIGHT)
 
-        # 题目卡片
-        self.card = QuestionCard(self)
-        self.card.pack(fill=tk.BOTH, expand=True)
+        # --- 可滚动的题目卡片区域 ---
+        self.scroll_container = tk.Frame(self)
+        self.scroll_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0, 5))
 
-        # 提交按钮
-        self.submit_btn = tk.Button(self, text="提交答案", command=self._submit, font=("Microsoft YaHei", 11))
-        self.submit_btn.pack(pady=10)
+        self.card_canvas = tk.Canvas(self.scroll_container, highlightthickness=0)
+        self.card_scrollbar = tk.Scrollbar(self.scroll_container, orient=tk.VERTICAL, command=self.card_canvas.yview)
+        self.card_frame = tk.Frame(self.card_canvas)
+        self.card_frame.bind("<Configure>", lambda e: self.card_canvas.configure(
+            scrollregion=self.card_canvas.bbox("all")))
+        self.card_canvas.create_window((0, 0), window=self.card_frame, anchor=tk.NW)
+        self.card_canvas.configure(yscrollcommand=self.card_scrollbar.set)
 
-        # 底部操作栏
+        self.card_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.card_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # 鼠标滚轮绑定
+        self.card_canvas.bind("<Enter>", lambda e: self.card_canvas.bind_all(
+            "<MouseWheel>", self._on_canvas_mousewheel))
+        self.card_canvas.bind("<Leave>", lambda e: self.card_canvas.unbind_all("<MouseWheel>"))
+
+        # 题目卡片（放入可滚动区域）
+        self.card = QuestionCard(self.card_frame, app=self.app)
+        self.card.pack(fill=tk.X, padx=5, pady=5)
+
+        # --- 提交按钮（始终可见）---
+        self.submit_btn = tk.Button(self, text="提交答案", command=self._submit,
+                                    font=self.app.get_font(11))
+        self.submit_btn.pack(pady=(0, 5))
+
+        # --- 底部操作栏（始终可见）---
         self.bottom_frame = tk.Frame(self)
-        self.bottom_frame.pack(fill=tk.X, padx=20, pady=10)
-        self.flag_btn = tk.Button(self.bottom_frame, text="标记", command=self._flag, font=("Microsoft YaHei", 10))
+        self.bottom_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+        self.flag_btn = tk.Button(self.bottom_frame, text="标记", command=self._flag,
+                                  font=self.app.get_font(10))
         self.flag_btn.pack(side=tk.LEFT, padx=(0, 5))
-        self.collect_btn = tk.Button(self.bottom_frame, text="收藏", command=self._collect, font=("Microsoft YaHei", 10))
+        self.collect_btn = tk.Button(self.bottom_frame, text="收藏", command=self._collect,
+                                     font=self.app.get_font(10))
         self.collect_btn.pack(side=tk.LEFT)
-        self.next_btn = tk.Button(self.bottom_frame, text="下一题 →", command=self._next, font=("Microsoft YaHei", 10))
+        self.next_btn = tk.Button(self.bottom_frame, text="下一题 →", command=self._next,
+                                  font=self.app.get_font(10))
         self.next_btn.pack(side=tk.RIGHT)
         self.next_btn.pack_forget()
 
         # 返回按钮
-        self.back_btn = tk.Button(self.bottom_frame, text="← 返回", command=self._save_and_go_back, font=("Microsoft YaHei", 10))
+        self.back_btn = tk.Button(self.bottom_frame, text="← 返回", command=self._save_and_go_back,
+                                  font=self.app.get_font(10))
         self.back_btn.pack(side=tk.LEFT)
 
         # 上一题按钮（回顾）
-        self.prev_btn = tk.Button(self.bottom_frame, text="← 上一题", command=self._prev, font=("Microsoft YaHei", 10))
+        self.prev_btn = tk.Button(self.bottom_frame, text="← 上一题", command=self._prev,
+                                  font=self.app.get_font(10))
 
         # 快捷键 - 绑定到本 frame，refresh 时获取焦点
         self.bind('<Return>', self._on_return)
@@ -77,6 +154,10 @@ class QuizPage(tk.Frame):
         self.bind('F', self._on_f)
         for letter in 'abcd':
             self.bind(letter, lambda e, l=letter.upper(): self.card.select_option(l))
+
+    def _on_canvas_mousewheel(self, event):
+        """鼠标滚轮滚动卡片区域"""
+        self.card_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def refresh(self, resume_data=None):
         """开始新一轮刷题"""
@@ -166,7 +247,7 @@ class QuizPage(tk.Frame):
     def _show_active_question(self):
         """以答题模式显示当前未答题"""
         self.answered = False
-        self.submit_btn.pack(pady=10)
+        self.submit_btn.pack(pady=(0, 5))
         self.next_btn.pack_forget()
         self.prev_btn.pack(side=tk.LEFT) if self.answers else self.prev_btn.pack_forget()
 
@@ -237,6 +318,9 @@ class QuizPage(tk.Frame):
 
     def _show_result(self):
         """显示刷题结果"""
+        # 刷题完成，删除进度文件
+        delete_quiz_progress(self.app.selected_bank['path'])
+
         total = len(self.questions)
         correct = self.correct_count
         wrong = total - correct
@@ -252,10 +336,12 @@ class QuizPage(tk.Frame):
             return
         q = self.questions[self.current_idx]
         bank = self.app.selected_bank
-        from tkinter import simpledialog
-        name = simpledialog.askstring("收藏", "输入收藏夹名称：", parent=self)
+        existing = get_collection_names(bank['path'])
+        dialog = CollectionPickerDialog(self, existing)
+        name = dialog.result
         if name:
-            save_bank_collection(bank['path'], name, q)
+            create_bank_collection(bank['path'], name)  # 已存在则无操作
+            add_to_bank_collection(bank['path'], name, q['id'], q['type'])
             messagebox.showinfo("成功", f'已加入收藏夹"{name}"')
 
     def _flag(self):

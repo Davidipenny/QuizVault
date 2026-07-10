@@ -21,13 +21,13 @@ class BankSelectPage(tk.Frame):
 
     def _build_ui(self):
         # 标题
-        tk.Label(self, text="选择题库", font=("Microsoft YaHei", 16, "bold")).pack(pady=15)
+        tk.Label(self, text="选择题库", font=self.app.get_font(16, bold=True)).pack(pady=15)
 
         # 题库列表
         list_frame = tk.Frame(self)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=20)
 
-        self.listbox = tk.Listbox(list_frame, font=("Microsoft YaHei", 12), height=15)
+        self.listbox = tk.Listbox(list_frame, font=self.app.get_font(12), height=15)
         scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.listbox.yview)
         self.listbox.config(yscrollcommand=scrollbar.set)
         self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -39,8 +39,10 @@ class BankSelectPage(tk.Frame):
         # 按钮区
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=10)
-        tk.Button(btn_frame, text="进入", command=self._enter_bank, width=10).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="退出", command=self.app.quit, width=10).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="进入", command=self._enter_bank, width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="退出", command=self.app.quit, width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
 
         self.refresh()
 

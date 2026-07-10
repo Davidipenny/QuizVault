@@ -14,8 +14,9 @@ from bank_manager import load_bank_flagged, remove_from_bank_flagged, add_to_ban
 class EditDialog(tk.Toplevel):
     """编辑题目对话框"""
 
-    def __init__(self, parent, question):
+    def __init__(self, parent, question, app=None):
         super().__init__(parent)
+        self.app = app
         self.question = question
         self.result = None
         self.title("编辑题目")
@@ -28,33 +29,39 @@ class EditDialog(tk.Toplevel):
         self.protocol("WM_DELETE_WINDOW", self._cancel)
         self.wait_window()
 
+    def _font(self, base_size):
+        if self.app and hasattr(self.app, 'get_font'):
+            return self.app.get_font(base_size)
+        return ("Microsoft YaHei", base_size)
+
     def _build_ui(self):
         # 题目信息
         info_frame = tk.Frame(self)
         info_frame.pack(fill=tk.X, padx=10, pady=5)
         qtype = "单选" if self.question['type'] == 'single' else "多选"
         tk.Label(info_frame, text=f"[{qtype}] {self.question['question'][:50]}...",
-                 font=("Microsoft YaHei", 10), wraplength=480).pack(anchor=tk.W)
+                 font=self._font(10), wraplength=480).pack(anchor=tk.W)
 
         # 题型选择
         type_frame = tk.Frame(self)
         type_frame.pack(fill=tk.X, padx=10, pady=5)
-        tk.Label(type_frame, text="题型：", font=("Microsoft YaHei", 10)).pack(side=tk.LEFT)
+        tk.Label(type_frame, text="题型：", font=self._font(10)).pack(side=tk.LEFT)
         self.type_var = tk.StringVar(value=self.question['type'])
         tk.Radiobutton(type_frame, text="单选", variable=self.type_var, value="single",
-                       font=("Microsoft YaHei", 10)).pack(side=tk.LEFT, padx=10)
+                       font=self._font(10)).pack(side=tk.LEFT, padx=10)
         tk.Radiobutton(type_frame, text="多选", variable=self.type_var, value="multi",
-                       font=("Microsoft YaHei", 10)).pack(side=tk.LEFT, padx=10)
+                       font=self._font(10)).pack(side=tk.LEFT, padx=10)
 
         # 答案
         ans_frame = tk.Frame(self)
         ans_frame.pack(fill=tk.X, padx=10, pady=5)
-        tk.Label(ans_frame, text="答案：", font=("Microsoft YaHei", 10)).pack(side=tk.LEFT)
+        tk.Label(ans_frame, text="答案：", font=self._font(10)).pack(side=tk.LEFT)
         self.answer_var = tk.StringVar(value=self.question['answer'])
-        tk.Entry(ans_frame, textvariable=self.answer_var, width=10, font=("Microsoft YaHei", 10)).pack(side=tk.LEFT, padx=5)
+        tk.Entry(ans_frame, textvariable=self.answer_var, width=10,
+                 font=self._font(10)).pack(side=tk.LEFT, padx=5)
 
         # 选项
-        opt_frame = tk.LabelFrame(self, text="选项", font=("Microsoft YaHei", 10))
+        opt_frame = tk.LabelFrame(self, text="选项", font=self._font(10))
         opt_frame.pack(fill=tk.X, padx=10, pady=5)
         self.option_vars = {}
         options = self.question.get('options', {})
@@ -62,15 +69,15 @@ class EditDialog(tk.Toplevel):
             for letter in sorted(options.keys()):
                 row = tk.Frame(opt_frame)
                 row.pack(fill=tk.X, padx=5, pady=2)
-                tk.Label(row, text=f"{letter}.", font=("Microsoft YaHei", 10), width=3).pack(side=tk.LEFT)
+                tk.Label(row, text=f"{letter}.", font=self._font(10), width=3).pack(side=tk.LEFT)
                 var = tk.StringVar(value=options[letter])
                 self.option_vars[letter] = var
-                tk.Entry(row, textvariable=var, font=("Microsoft YaHei", 10)).pack(side=tk.LEFT, fill=tk.X, expand=True)
+                tk.Entry(row, textvariable=var, font=self._font(10)).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # 解析
-        exp_frame = tk.LabelFrame(self, text="解析", font=("Microsoft YaHei", 10))
+        exp_frame = tk.LabelFrame(self, text="解析", font=self._font(10))
         exp_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        self.exp_text = tk.Text(exp_frame, height=4, font=("Microsoft YaHei", 10), wrap=tk.WORD)
+        self.exp_text = tk.Text(exp_frame, height=4, font=self._font(10), wrap=tk.WORD)
         self.exp_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         exp = self.question.get('explanation', '')
         if exp:
@@ -106,11 +113,11 @@ class FlaggedPage(tk.Frame):
         self._build_ui()
 
     def _build_ui(self):
-        tk.Label(self, text="标记题目", font=("Microsoft YaHei", 16, "bold")).pack(pady=15)
+        tk.Label(self, text="标记题目", font=self.app.get_font(16, bold=True)).pack(pady=15)
 
         list_frame = tk.Frame(self)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=20)
-        self.listbox = tk.Listbox(list_frame, font=("Microsoft YaHei", 11), height=15)
+        self.listbox = tk.Listbox(list_frame, font=self.app.get_font(11), height=15)
         scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.listbox.yview)
         self.listbox.config(yscrollcommand=scrollbar.set)
         self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -118,10 +125,14 @@ class FlaggedPage(tk.Frame):
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=10)
-        tk.Button(btn_frame, text="编辑", command=self._edit, width=10).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="删除", command=self._delete, width=10).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="取消标记", command=self._unflag, width=10).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="返回", command=lambda: self.app.show_page('operations'), width=10).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="编辑", command=self._edit, width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="删除", command=self._delete, width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="取消标记", command=self._unflag, width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="返回", command=lambda: self.app.show_page('operations'), width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
 
     def refresh(self):
         bank = self.app.selected_bank
@@ -161,7 +172,7 @@ class FlaggedPage(tk.Frame):
             messagebox.showwarning("提示", "题目已删除，无法编辑")
             return
 
-        dialog = EditDialog(self, q)
+        dialog = EditDialog(self, q, app=self.app)
         if dialog.result:
             # 更新源 .md 文件
             if self._save_to_md(q, dialog.result):
@@ -228,13 +239,11 @@ class FlaggedPage(tk.Frame):
         new_type = edits.get('type')
         if new_type and new_type != question['type']:
             if new_type == 'single':
-                # 从多选改为单选
                 if '<!-- multi -->' in block:
                     block = block.replace('<!-- multi -->', '<!-- single -->')
                 elif '<!-- single -->' not in block:
                     block = '<!-- single -->\n' + block
             elif new_type == 'multi':
-                # 从单选改为多选
                 if '<!-- single -->' in block:
                     block = block.replace('<!-- single -->', '<!-- multi -->')
                 elif '<!-- multi -->' not in block:

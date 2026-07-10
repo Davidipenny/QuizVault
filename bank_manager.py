@@ -226,6 +226,42 @@ def load_bank_collections(bank_path: str) -> dict:
         return {"collections": {}}
 
 
+def get_collection_names(bank_path: str) -> list:
+    """
+    返回题库的收藏夹名称列表
+
+    Args:
+        bank_path: 题库文件夹路径
+
+    Returns:
+        排序的收藏夹名称列表
+    """
+    data = load_bank_collections(bank_path)
+    return sorted(data.get("collections", {}).keys())
+
+
+def _ensure_collection_dict_format(collections, name):
+    """
+    确保收藏夹使用 dict 格式（{'created': ..., 'questions': [...]}）。
+    若为旧 list 格式，自动迁移到 dict 格式。
+
+    Args:
+        collections: collections dict
+        name: 收藏夹名称
+
+    Returns:
+        收藏夹值（统一为 dict 格式）
+    """
+    from datetime import datetime
+    val = collections[name]
+    if isinstance(val, list):
+        collections[name] = {
+            'created': datetime.now().strftime('%Y-%m-%d'),
+            'questions': val,
+        }
+    return collections[name]
+
+
 def save_bank_collection(bank_path: str, collection_name: str, question: dict) -> None:
     """
     保存题目到指定收藏夹
@@ -235,16 +271,21 @@ def save_bank_collection(bank_path: str, collection_name: str, question: dict) -
         collection_name: 收藏夹名称
         question: 题目字典
     """
+    from datetime import datetime
     data = load_bank_collections(bank_path)
     collections = data.get("collections", {})
 
     if collection_name not in collections:
-        collections[collection_name] = []
+        collections[collection_name] = {
+            'created': datetime.now().strftime('%Y-%m-%d'),
+            'questions': []
+        }
 
-    collection = collections[collection_name]
+    collection = _ensure_collection_dict_format(collections, collection_name)
+    questions = collection['questions']
 
     # 检查是否已存在
-    existing_keys = [(q['id'], q['type']) for q in collection]
+    existing_keys = [(q['id'], q['type']) for q in questions]
     if (question['id'], question['type']) not in existing_keys:
         entry = {
             'id': question['id'],
@@ -254,8 +295,10 @@ def save_bank_collection(bank_path: str, collection_name: str, question: dict) -
             'answer': question['answer'],
             'explanation': question.get('explanation', ''),
         }
-        collection.append(entry)
+        questions.append(entry)
 
+    collection['questions'] = questions
+    collections[collection_name] = collection
     data['collections'] = collections
     filepath = os.path.join(bank_path, COLLECTIONS_FILE)
     try:
@@ -382,7 +425,8 @@ def add_to_bank_collection(bank_path: str, name: str, question_id: int, question
     if name not in collections:
         return False
 
-    questions = collections[name].get('questions', [])
+    collection = _ensure_collection_dict_format(collections, name)
+    questions = collection['questions']
     for q in questions:
         if q['id'] == question_id and q['type'] == question_type:
             return False
@@ -424,7 +468,8 @@ def remove_from_bank_collection(bank_path: str, name: str, question_id: int, que
     if name not in collections:
         return False
 
-    questions = collections[name].get('questions', [])
+    collection = _ensure_collection_dict_format(collections, name)
+    questions = collection['questions']
     for i, q in enumerate(questions):
         if q['id'] == question_id and q['type'] == question_type:
             questions.pop(i)

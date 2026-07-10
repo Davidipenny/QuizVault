@@ -13,24 +13,26 @@ class ResultPage(tk.Frame):
         self._build_ui()
 
     def _build_ui(self):
-        tk.Label(self, text="刷题结束", font=("Microsoft YaHei", 18, "bold")).pack(pady=30)
+        tk.Label(self, text="刷题结束", font=self.app.get_font(18, bold=True)).pack(pady=30)
 
         self.stats_frame = tk.Frame(self)
         self.stats_frame.pack(pady=10)
 
-        self.total_label = tk.Label(self.stats_frame, font=("Microsoft YaHei", 13))
+        self.total_label = tk.Label(self.stats_frame, font=self.app.get_font(13))
         self.total_label.pack(pady=3)
-        self.correct_label = tk.Label(self.stats_frame, font=("Microsoft YaHei", 13), fg="green")
+        self.correct_label = tk.Label(self.stats_frame, font=self.app.get_font(13), fg="green")
         self.correct_label.pack(pady=3)
-        self.wrong_label = tk.Label(self.stats_frame, font=("Microsoft YaHei", 13), fg="red")
+        self.wrong_label = tk.Label(self.stats_frame, font=self.app.get_font(13), fg="red")
         self.wrong_label.pack(pady=3)
-        self.accuracy_label = tk.Label(self.stats_frame, font=("Microsoft YaHei", 13), fg="blue")
+        self.accuracy_label = tk.Label(self.stats_frame, font=self.app.get_font(13), fg="blue")
         self.accuracy_label.pack(pady=3)
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=30)
-        tk.Button(btn_frame, text="重新刷题", command=self._retry, width=15, font=("Microsoft YaHei", 11)).pack(side=tk.LEFT, padx=10)
-        tk.Button(btn_frame, text="返回操作页", command=self._back, width=15, font=("Microsoft YaHei", 11)).pack(side=tk.LEFT, padx=10)
+        tk.Button(btn_frame, text="重新刷题", command=self._retry, width=15,
+                  font=self.app.get_font(11)).pack(side=tk.LEFT, padx=10)
+        tk.Button(btn_frame, text="返回操作页", command=self._back, width=15,
+                  font=self.app.get_font(11)).pack(side=tk.LEFT, padx=10)
 
     def refresh(self):
         total = self.app.quiz_total

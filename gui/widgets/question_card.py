@@ -7,18 +7,27 @@ import tkinter as tk
 class QuestionCard(tk.Frame):
     """题目卡片 - 显示题干、选项、反馈，可被多个页面复用"""
 
-    def __init__(self, master):
+    def __init__(self, master, app=None):
         super().__init__(master)
+        self.app = app
         self.selected_answer = tk.StringVar()
         self.check_vars = {}
         self.option_widgets = []
         self._locked = False
         self._build_ui()
 
+    def _font(self, base_size, bold=False):
+        """获取缩放后的字体，有 app 引用时使用全局缩放"""
+        if self.app and hasattr(self.app, 'get_font'):
+            return self.app.get_font(base_size, bold)
+        if bold:
+            return ("Microsoft YaHei", base_size, "bold")
+        return ("Microsoft YaHei", base_size)
+
     def _build_ui(self):
         # 题干
         self.question_label = tk.Label(
-            self, font=("Microsoft YaHei", 13),
+            self, font=self._font(13),
             wraplength=650, justify=tk.LEFT, anchor=tk.W,
         )
         self.question_label.pack(fill=tk.X, padx=10, pady=10)
@@ -29,13 +38,13 @@ class QuestionCard(tk.Frame):
 
         # 反馈区
         self.feedback_label = tk.Label(
-            self, font=("Microsoft YaHei", 12),
+            self, font=self._font(12),
             wraplength=650, justify=tk.LEFT,
         )
         self.feedback_label.pack(fill=tk.X, padx=10, pady=5)
 
         self.explanation_label = tk.Label(
-            self, font=("Microsoft YaHei", 10), fg="gray",
+            self, font=self._font(10), fg="gray",
             wraplength=650, justify=tk.LEFT,
         )
         self.explanation_label.pack(fill=tk.X, padx=10, pady=2)
@@ -71,7 +80,7 @@ class QuestionCard(tk.Frame):
                     self.options_frame,
                     text=f"{letter}. {q['options'][letter]}",
                     variable=self.selected_answer, value=letter,
-                    font=("Microsoft YaHei", 11), anchor=tk.W,
+                    font=self._font(11), anchor=tk.W,
                 )
                 rb.pack(fill=tk.X, pady=2)
                 self.option_widgets.append(rb)
@@ -81,7 +90,7 @@ class QuestionCard(tk.Frame):
                     self.options_frame,
                     text=f"{letter}. {q['options'][letter]}",
                     variable=self.selected_answer, value=letter,
-                    font=("Microsoft YaHei", 11), anchor=tk.W,
+                    font=self._font(11), anchor=tk.W,
                 )
                 rb.pack(fill=tk.X, pady=2)
                 self.option_widgets.append(rb)
@@ -93,7 +102,7 @@ class QuestionCard(tk.Frame):
                     self.options_frame,
                     text=f"{letter}. {q['options'][letter]}",
                     variable=var,
-                    font=("Microsoft YaHei", 11), anchor=tk.W,
+                    font=self._font(11), anchor=tk.W,
                 )
                 cb.pack(fill=tk.X, pady=2)
                 self.option_widgets.append(cb)

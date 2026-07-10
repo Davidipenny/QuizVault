@@ -21,11 +21,11 @@ class WrongBookPage(tk.Frame):
         self._build_ui()
 
     def _build_ui(self):
-        tk.Label(self, text="错题本", font=("Microsoft YaHei", 16, "bold")).pack(pady=15)
+        tk.Label(self, text="错题本", font=self.app.get_font(16, bold=True)).pack(pady=15)
 
         list_frame = tk.Frame(self)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=20)
-        self.listbox = tk.Listbox(list_frame, font=("Microsoft YaHei", 12), height=15)
+        self.listbox = tk.Listbox(list_frame, font=self.app.get_font(12), height=15)
         scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.listbox.yview)
         self.listbox.config(yscrollcommand=scrollbar.set)
         self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -33,9 +33,12 @@ class WrongBookPage(tk.Frame):
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=10)
-        tk.Button(btn_frame, text="开始刷题", command=self._start_review, width=12).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="新建错题本", command=self._create_book, width=12).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="返回", command=lambda: self.app.show_page('operations'), width=12).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="开始刷题", command=self._start_review, width=12,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="新建错题本", command=self._create_book, width=12,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="返回", command=lambda: self.app.show_page('operations'), width=12,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
 
     def refresh(self):
         bank = self.app.selected_bank
@@ -43,7 +46,9 @@ class WrongBookPage(tk.Frame):
         self.wrong_books = data.get('wrong_books', {})
         self.listbox.delete(0, tk.END)
         for name, questions in self.wrong_books.items():
-            self.listbox.insert(tk.END, f"{name}（{len(questions)} 题）")
+            unique_count = len(questions)
+            total_wrong = sum(q.get('wrong_count', 1) for q in questions)
+            self.listbox.insert(tk.END, f"{name}（{unique_count} 题, 累计错误 {total_wrong} 次）")
 
     def _start_review(self):
         selection = self.listbox.curselection()

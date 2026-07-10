@@ -48,13 +48,16 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("QuizVault 选择题刷题系统")
-        self.geometry("700x500")
+        self.geometry("900x650")
         self.resizable(True, True)
-        self.minsize(600, 400)
+        self.minsize(800, 550)
 
         self.pages = {}
         self.current_page = None
         self.selected_bank = None
+
+        # 字体缩放比例（0.6 ~ 2.0，默认 1.0）
+        self.font_scale = 1.0
 
         # 注册页面
         self.pages['bank_select'] = BankSelectPage(self, self, BANKS_FOLDER)
@@ -95,6 +98,21 @@ class App(tk.Tk):
                 page.refresh()
         page.pack(fill=tk.BOTH, expand=True)
         self.current_page = page
+
+    def get_font(self, base_size, bold=False):
+        """返回按 font_scale 缩放后的字体元组"""
+        size = max(7, round(base_size * self.font_scale))
+        if bold:
+            return ("Microsoft YaHei", size, "bold")
+        return ("Microsoft YaHei", size)
+
+    def increase_font(self):
+        """放大字体"""
+        self.font_scale = min(2.0, self.font_scale + 0.1)
+
+    def decrease_font(self):
+        """缩小字体"""
+        self.font_scale = max(0.6, self.font_scale - 0.1)
 
 
 if __name__ == '__main__':

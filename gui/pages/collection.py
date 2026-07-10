@@ -39,11 +39,11 @@ class CollectionPage(tk.Frame):
         self._build_ui()
 
     def _build_ui(self):
-        tk.Label(self, text="收藏夹管理", font=("Microsoft YaHei", 16, "bold")).pack(pady=15)
+        tk.Label(self, text="收藏夹管理", font=self.app.get_font(16, bold=True)).pack(pady=15)
 
         list_frame = tk.Frame(self)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=20)
-        self.listbox = tk.Listbox(list_frame, font=("Microsoft YaHei", 12), height=15)
+        self.listbox = tk.Listbox(list_frame, font=self.app.get_font(12), height=15)
         scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.listbox.yview)
         self.listbox.config(yscrollcommand=scrollbar.set)
         self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -53,10 +53,14 @@ class CollectionPage(tk.Frame):
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=10)
-        tk.Button(btn_frame, text="打开", command=self._open_detail, width=10).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="新建", command=self._create, width=10).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="删除", command=self._delete, width=10).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="返回", command=lambda: self.app.show_page('operations'), width=10).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="打开", command=self._open_detail, width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="新建", command=self._create, width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="删除", command=self._delete, width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="返回", command=lambda: self.app.show_page('operations'), width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
 
     def refresh(self):
         bank = self.app.selected_bank
@@ -108,12 +112,12 @@ class CollectionDetailPage(tk.Frame):
         self._build_ui()
 
     def _build_ui(self):
-        self.title_label = tk.Label(self, font=("Microsoft YaHei", 16, "bold"))
+        self.title_label = tk.Label(self, font=self.app.get_font(16, bold=True))
         self.title_label.pack(pady=15)
 
         list_frame = tk.Frame(self)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=20)
-        self.listbox = tk.Listbox(list_frame, font=("Microsoft YaHei", 11), height=15)
+        self.listbox = tk.Listbox(list_frame, font=self.app.get_font(11), height=15)
         scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.listbox.yview)
         self.listbox.config(yscrollcommand=scrollbar.set)
         self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -121,13 +125,20 @@ class CollectionDetailPage(tk.Frame):
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=10)
-        tk.Button(btn_frame, text="顺序刷题", command=lambda: self._start_quiz('sequential'), width=10).pack(side=tk.LEFT, padx=3)
-        tk.Button(btn_frame, text="随机刷题", command=lambda: self._start_quiz('random'), width=10).pack(side=tk.LEFT, padx=3)
-        tk.Button(btn_frame, text="重命名", command=self._rename, width=8).pack(side=tk.LEFT, padx=3)
-        tk.Button(btn_frame, text="删除", command=self._delete, width=8).pack(side=tk.LEFT, padx=3)
-        tk.Button(btn_frame, text="导出MD", command=self._export, width=8).pack(side=tk.LEFT, padx=3)
-        tk.Button(btn_frame, text="移除题目", command=self._remove_question, width=8).pack(side=tk.LEFT, padx=3)
-        tk.Button(btn_frame, text="返回", command=lambda: self.app.show_page('collection'), width=8).pack(side=tk.LEFT, padx=3)
+        tk.Button(btn_frame, text="顺序刷题", command=lambda: self._start_quiz('sequential'), width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
+        tk.Button(btn_frame, text="随机刷题", command=lambda: self._start_quiz('random'), width=10,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
+        tk.Button(btn_frame, text="重命名", command=self._rename, width=8,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
+        tk.Button(btn_frame, text="删除", command=self._delete, width=8,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
+        tk.Button(btn_frame, text="导出MD", command=self._export, width=8,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
+        tk.Button(btn_frame, text="移除题目", command=self._remove_question, width=8,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
+        tk.Button(btn_frame, text="返回", command=lambda: self.app.show_page('collection'), width=8,
+                  font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
 
     def refresh(self):
         name = self.app.selected_collection
