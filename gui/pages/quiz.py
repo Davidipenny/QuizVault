@@ -109,11 +109,6 @@ class QuizPage(tk.Frame):
         self.card_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.card_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # 鼠标滚轮绑定
-        self.card_canvas.bind("<Enter>", lambda e: self.card_canvas.bind_all(
-            "<MouseWheel>", self._on_canvas_mousewheel))
-        self.card_canvas.bind("<Leave>", lambda e: self.card_canvas.unbind_all("<MouseWheel>"))
-
         # 题目卡片（放入可滚动区域）
         self.card = QuestionCard(self.card_frame, app=self.app)
         self.card.pack(fill=tk.X, padx=5, pady=5)
@@ -201,6 +196,8 @@ class QuizPage(tk.Frame):
             self.answers = {}
 
         self.answered = False
+        # 设置鼠标滚轮绑定（在 show_page 的 unbind_all 之后重新绑定）
+        self.bind_all("<MouseWheel>", self._on_canvas_mousewheel)
         self._show_question()
 
     def _show_question(self):

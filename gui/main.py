@@ -86,6 +86,11 @@ class App(tk.Tk):
 
     def show_page(self, page_name: str):
         """切换到指定页面"""
+        # 切换前清空所有全局鼠标滚轮绑定，避免页面间冲突
+        try:
+            self.unbind_all("<MouseWheel>")
+        except Exception:
+            pass
         if self.current_page:
             self.current_page.pack_forget()
         page = self.pages[page_name]

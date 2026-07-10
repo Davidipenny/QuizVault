@@ -42,9 +42,8 @@ class BatchDeletePage(tk.Frame):
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Bind mousewheel to canvas for scrolling
-        self.canvas.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
-        self.scrollable_frame.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+        # 鼠标滚轮绑定方法
+        self._batch_mousewheel = lambda e: self.canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
 
         btn_frame = tk.Frame(self)
         btn_frame.pack(pady=10)
@@ -54,6 +53,8 @@ class BatchDeletePage(tk.Frame):
                   font=self.app.get_font(10)).pack(side=tk.LEFT, padx=5)
 
     def refresh(self):
+        # 设置本页面的鼠标滚轮绑定（show_page 的 unbind_all 之后重新绑定）
+        self.bind_all("<MouseWheel>", self._batch_mousewheel)
         for w in self.scrollable_frame.winfo_children():
             w.destroy()
         self.check_vars = []
@@ -67,7 +68,6 @@ class BatchDeletePage(tk.Frame):
             cb = tk.Checkbutton(self.scrollable_frame, text=text, variable=var, anchor=tk.W,
                                 font=self.app.get_font(10))
             cb.pack(fill=tk.X, pady=1)
-            cb.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
 
     def _select_all(self):
         for var, _ in self.check_vars:

@@ -25,10 +25,13 @@ class OperationsPage(tk.Frame):
         # 字体调节按钮
         font_frame = tk.Frame(self)
         font_frame.pack(pady=(0, 5))
-        tk.Button(font_frame, text="A−", command=self._decrease_font,
-                  width=4, font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
-        tk.Button(font_frame, text="A+", command=self._increase_font,
-                  width=4, font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
+        tk.Label(font_frame, text="字体大小：", font=self.app.get_font(10)).pack(side=tk.LEFT)
+        self.font_scale_label = tk.Label(font_frame, text="100%", font=self.app.get_font(10), width=5)
+        self.font_scale_label.pack(side=tk.LEFT)
+        tk.Button(font_frame, text="缩小", command=self._decrease_font,
+                  width=6, font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
+        tk.Button(font_frame, text="放大", command=self._increase_font,
+                  width=6, font=self.app.get_font(10)).pack(side=tk.LEFT, padx=3)
 
         self.info_label = tk.Label(self, font=self.app.get_font(11))
         self.info_label.pack(pady=5)
@@ -37,23 +40,29 @@ class OperationsPage(tk.Frame):
         container = tk.Frame(self)
         container.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
 
-        canvas = tk.Canvas(container, highlightthickness=0)
-        scrollbar = tk.Scrollbar(container, orient=tk.VERTICAL, command=canvas.yview)
-        btn_frame = tk.Frame(canvas)
+        self._op_canvas = tk.Canvas(container, highlightthickness=0)
+        scrollbar = tk.Scrollbar(container, orient=tk.VERTICAL, command=self._op_canvas.yview)
+        self._op_btn_frame = tk.Frame(self._op_canvas)
 
-        btn_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=btn_frame, anchor=tk.N)
-        canvas.configure(yscrollcommand=scrollbar.set)
+        self._op_btn_frame.bind("<Configure>", lambda e: self._op_canvas.configure(
+            scrollregion=self._op_canvas.bbox("all")))
+        self._op_canvas.create_window((0, 0), window=self._op_btn_frame, anchor=tk.N)
+        self._op_canvas.configure(yscrollcommand=scrollbar.set)
 
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self._op_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # 绑定鼠标滚轮
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        # 按首次刷新创建按钮（refresh 中会重建）
+        self._buttons_data = None
 
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+    def _on_op_mousewheel(self, event):
+        """操作页功能按钮区鼠标滚轮"""
+        self._op_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
+    def _rebuild_buttons(self):
+        """（重新）创建功能按钮，使用当前字体大小"""
+        for w in self._op_btn_frame.winfo_children():
+            w.destroy()
         buttons = [
             ("顺序刷题（判断）", lambda: self._start_quiz('sequential', 'truefalse')),
             ("随机刷题（判断）", lambda: self._start_quiz('random', 'truefalse')),
@@ -69,16 +78,8 @@ class OperationsPage(tk.Frame):
             ("批量删题", lambda: self.app.show_page('batch_delete')),
             ("返回题库选择", lambda: self.app.show_page('bank_select')),
         ]
-
-        self._btn_frame = btn_frame
-        self._rebuild_buttons(buttons)
-
-    def _rebuild_buttons(self, buttons):
-        """（重新）创建功能按钮，使用当前字体大小"""
-        for w in self._btn_frame.winfo_children():
-            w.destroy()
         for text, cmd in buttons:
-            tk.Button(self._btn_frame, text=text, command=cmd, width=20,
+            tk.Button(self._op_btn_frame, text=text, command=cmd, width=20,
                       font=self.app.get_font(10)).pack(pady=3)
 
     def _increase_font(self):
@@ -100,23 +101,11 @@ class OperationsPage(tk.Frame):
             single = sum(1 for q in questions if q['type'] == 'single')
             multi = sum(1 for q in questions if q['type'] == 'multi')
             self.info_label.config(text=f"共 {len(questions)} 题（判断 {truefalse} / 单选 {single} / 多选 {multi}）")
-        # 刷新按钮字体
-        buttons_data = [
-            ("顺序刷题（判断）", lambda: self._start_quiz('sequential', 'truefalse')),
-            ("随机刷题（判断）", lambda: self._start_quiz('random', 'truefalse')),
-            ("顺序刷题（单选）", lambda: self._start_quiz('sequential', 'single')),
-            ("随机刷题（单选）", lambda: self._start_quiz('random', 'single')),
-            ("顺序刷题（多选）", lambda: self._start_quiz('sequential', 'multi')),
-            ("随机刷题（多选）", lambda: self._start_quiz('random', 'multi')),
-            ("顺序刷题（全部）", lambda: self._start_quiz('sequential', 'all')),
-            ("随机刷题（全部）", lambda: self._start_quiz('random', 'all')),
-            ("错题回顾", lambda: self.app.show_page('wrong_book')),
-            ("收藏夹管理", lambda: self.app.show_page('collection')),
-            ("标记题目", lambda: self.app.show_page('flagged')),
-            ("批量删题", lambda: self.app.show_page('batch_delete')),
-            ("返回题库选择", lambda: self.app.show_page('bank_select')),
-        ]
-        self._rebuild_buttons(buttons_data)
+        # 刷新按钮字体和字体缩放百分比
+        self._rebuild_buttons()
+        self.font_scale_label.config(text=f"{round(self.app.font_scale * 100)}%")
+        # 设置本页面的鼠标滚轮绑定（show_page 的 unbind_all 之后重新绑定）
+        self.bind_all("<MouseWheel>", self._on_op_mousewheel)
 
     def _start_quiz(self, mode, q_type):
         """开始刷题"""

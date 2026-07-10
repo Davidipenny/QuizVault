@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "banks/毛概往年题/2020春wh.md",
+                "file": "gui/README.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2020春wh"
+              "title": "README"
             }
           }
         ]
@@ -185,7 +185,27 @@
   },
   "active": "c98ee52e36238196",
   "lastOpenFiles": [
+    "test/测试.md",
+    "gui/README.md",
+    "待优化事项.md",
+    "AGENTS.md",
+    "CLAUDE.md",
     "README.md",
-    "gui/README.md"
+    "QuizVault-GUI-v1.3/banks/毛概往年题/wrong_questions.json",
+    "QuizVault-GUI-v1.3/banks/毛概往年题/quiz_progress.json",
+    "QuizVault-GUI-v1.3/banks/毛概选择题大全/选择题2.md",
+    "QuizVault-GUI-v1.3/banks/毛概选择题大全/选择题1.md",
+    "QuizVault-GUI-v1.3/banks/毛概选择题大全",
+    "QuizVault-GUI-v1.3/banks/毛概选择题压缩版/压缩版.md",
+    "QuizVault-GUI-v1.3/banks/毛概选择题压缩版",
+    "QuizVault-GUI-v1.3/banks/毛概往年题/哈工大2022秋.md",
+    "QuizVault-GUI-v1.3/banks/毛概往年题/2025春毛概期末试卷.md",
+    "QuizVault-GUI-v1.3/banks/毛概往年题/2024年春毛概期末考试回忆版答案.md",
+    "QuizVault-GUI-v1.3/banks/毛概往年题/2023毛概试题回忆.md",
+    "QuizVault-GUI-v1.3/banks/毛概往年题/2018春.md",
+    "QuizVault-GUI-v1.3/banks/毛概往年题",
+    "QuizVault-GUI-v1.3/banks",
+    "QuizVault-GUI-v1.3/quiz_gui.exe",
+    "QuizVault-GUI-v1.3"
   ]
 }
