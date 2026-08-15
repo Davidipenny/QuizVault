@@ -5,7 +5,7 @@ import { Reading } from '@element-plus/icons-vue'
 import { api } from '../api'
 import { useAppStore } from '../stores/app'
 const router=useRouter(),store=useAppStore(),tab=ref('wrong'),bankId=ref(''),collectionId=ref(''),collections=ref<any[]>([]),items=ref<any[]>([]),stats=ref<any>({}),loading=ref(false)
-const tabs=[{label:'错题',value:'wrong'},{label:'快速收藏',value:'favorite'},{label:'收藏夹',value:'collection'},{label:'笔记',value:'note'},{label:'纠错标记',value:'flagged'},{label:'答题历史',value:'history'}]
+const tabs=[{label:'错题',value:'wrong'},{label:'未做题',value:'unanswered'},{label:'快速收藏',value:'favorite'},{label:'收藏夹',value:'collection'},{label:'笔记',value:'note'},{label:'纠错标记',value:'flagged'},{label:'答题历史',value:'history'}]
 onMounted(async()=>{await store.loadBanks();[stats.value,collections.value]=await Promise.all([api('/stats'),api('/collections')]);collectionId.value=collections.value[0]?.id||'';load()});watch([tab,bankId,collectionId],load)
 async function load(){loading.value=true;try{if(tab.value==='history'){const p=new URLSearchParams({bank_id:bankId.value});items.value=(await api<any>(`/quiz-answers?${p}`)).items}else if(tab.value==='collection'){if(!collectionId.value){items.value=[];return}const data=await api<any>(`/collections/${collectionId.value}/questions`);items.value=data.items.map((question:any)=>({question,collection:true}))}else{const p=new URLSearchParams({kind:tab.value,bank_id:bankId.value});items.value=(await api<any>(`/study-states?${p}`)).items}}finally{loading.value=false}}
 </script>

@@ -20,6 +20,13 @@ export async function api<T = any>(path: string, options: RequestInit = {}): Pro
 
 export const jsonBody = (value: unknown): RequestInit => ({ body: JSON.stringify(value) })
 
+export function authorizedDownloadUrl(path: string): string {
+  const target = path.startsWith('/api/v1') ? path : `/api/v1${path}`
+  const url = new URL(target, location.origin)
+  if (token) url.searchParams.set('token', token)
+  return `${url.pathname}${url.search}`
+}
+
 export function fileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -28,4 +35,3 @@ export function fileAsBase64(file: File): Promise<string> {
     reader.readAsDataURL(file)
   })
 }
-

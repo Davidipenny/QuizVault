@@ -48,6 +48,8 @@ def test_end_to_end_local_flow():
         quiz = client.post("/api/v1/quiz-sessions", json={"bank_id": bank["id"], "config": {"types": ["single"], "order": "sequential"}}).json()
         session = client.get(f"/api/v1/quiz-sessions/{quiz['id']}").json()
         assert len(session["questions"]) == 1
+        assert "answer_spec" not in session["questions"][0]
+        assert "is_correct" not in session["questions"][0]["choices"][0]
         answer = client.post(f"/api/v1/quiz-sessions/{quiz['id']}/answers", json={"question_id": question["id"], "answer": {"selected": ["B"]}}).json()
         assert answer["is_correct"] is False
         states = client.get("/api/v1/study-states?kind=wrong").json()
@@ -90,3 +92,33 @@ def test_end_to_end_local_flow():
 
         backup = client.post("/api/v1/backups").json()
         assert backup["filename"].endswith(".db")
+
+
+def test_quiz_contract_hides_answers_and_lists_unanswered_questions():
+    fill = {
+        "type": "fill",
+        "prompt": "两空题",
+        "case_material": "",
+        "explanation": "两个答案可以交换",
+        "source": "test",
+        "choices": [],
+        "answer_spec": {"blanks": [["甲"], ["乙"]], "unordered": True},
+    }
+    with TestClient(app) as client:
+        bank = client.post("/api/v1/banks", json={"name": "会话契约题库"}).json()
+        question = client.post(f"/api/v1/banks/{bank['id']}/questions", json=fill).json()
+
+        unanswered = client.get("/api/v1/study-states", params={"kind": "unanswered", "bank_id": bank["id"]}).json()
+        assert unanswered["total"] == 1
+        assert unanswered["items"][0]["question_id"] == question["id"]
+
+        normal = client.post("/api/v1/quiz-sessions", json={"bank_id": bank["id"], "config": {"study_mode": False}}).json()
+        normal_question = client.get(f"/api/v1/quiz-sessions/{normal['id']}").json()["questions"][0]
+        assert "answer_spec" not in normal_question
+        assert normal_question["answer_meta"] == {"blank_count": 2, "unordered": True}
+        assert normal_question["explanation"] == ""
+
+        study = client.post("/api/v1/quiz-sessions", json={"bank_id": bank["id"], "config": {"study_mode": True}}).json()
+        study_question = client.get(f"/api/v1/quiz-sessions/{study['id']}").json()["questions"][0]
+        assert study_question["answer_spec"]["blanks"] == [["甲"], ["乙"]]
+        assert study_question["explanation"] == "两个答案可以交换"

@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Document, FolderOpened, Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { api, fileAsBase64, jsonBody } from '../api'
+import { api, authorizedDownloadUrl, fileAsBase64, jsonBody } from '../api'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore(), router = useRouter()
@@ -33,7 +33,7 @@ async function commit() {
   } catch(error:any) { ElMessage.error(error.message) }
 }
 function chooseFile(upload:any) { file.value = upload.raw }
-function downloadTemplate() { window.open('/api/v1/imports/template/excel', '_blank') }
+function downloadTemplate() { window.open(authorizedDownloadUrl('/imports/template/excel'), '_blank') }
 async function previewLegacy() { try { legacy.value=await api('/migration/legacy/preview') } catch(error:any) { ElMessage.error(error.message) } }
 async function commitLegacy() { try { const r=await api<any>('/migration/legacy/commit',{method:'POST',...jsonBody({})}); ElMessage.success(`迁移完成：新增 ${r.banks} 个题库、${r.questions} 道题`); await store.loadBanks(); await previewLegacy() } catch(error:any) { ElMessage.error(error.message) } }
 </script>

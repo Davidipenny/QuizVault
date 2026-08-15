@@ -3,14 +3,16 @@ from __future__ import annotations
 from .models import Choice, Question, QuestionBank, QuizAnswer, QuizSession, StudyState
 
 
-def choice_dict(choice: Choice) -> dict:
-    return {
+def choice_dict(choice: Choice, include_answer: bool = True) -> dict:
+    data = {
         "id": choice.id,
         "label": choice.label,
         "content": choice.content,
-        "is_correct": choice.is_correct,
         "display_order": choice.display_order,
     }
+    if include_answer:
+        data["is_correct"] = choice.is_correct
+    return data
 
 
 def question_dict(question: Question, include_answer: bool = True) -> dict:
@@ -20,15 +22,24 @@ def question_dict(question: Question, include_answer: bool = True) -> dict:
         "type": question.type,
         "prompt": question.prompt,
         "case_material": question.case_material,
-        "explanation": question.explanation,
+        "explanation": question.explanation if include_answer else "",
         "source": question.source,
         "sort_order": question.sort_order,
         "version": question.version,
-        "choices": [choice_dict(c) for c in question.choices],
+        "choices": [choice_dict(c, include_answer) for c in question.choices],
     }
     if include_answer:
         data["answer_spec"] = question.answer_spec
+    else:
+        data["answer_meta"] = answer_meta(question)
     return data
+
+
+def answer_meta(question: Question) -> dict:
+    if question.type == "fill":
+        blanks = (question.answer_spec or {}).get("blanks") or []
+        return {"blank_count": len(blanks), "unordered": bool((question.answer_spec or {}).get("unordered"))}
+    return {}
 
 
 def bank_dict(bank: QuestionBank, question_count: int = 0, last_studied_at=None) -> dict:
@@ -87,4 +98,3 @@ def session_dict(session: QuizSession, answers: list[QuizAnswer] | None = None) 
         "completed_at": session.completed_at,
         "answers": [answer_dict(a) for a in answers or []],
     }
-

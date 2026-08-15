@@ -3,14 +3,14 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Download, Refresh, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { api, fileAsBase64, jsonBody } from '../api'
+import { api, authorizedDownloadUrl, fileAsBase64, jsonBody } from '../api'
 import { useAppStore } from '../stores/app'
 
 const store=useAppStore(),router=useRouter(),backups=ref<any[]>([]),creating=ref(false)
 onMounted(load)
 async function load(){backups.value=await api('/backups')}
 async function backup(){creating.value=true;try{await api('/backups',{method:'POST'});await load();ElMessage.success('备份已创建')}finally{creating.value=false}}
-function download(name:string){window.open(`/api/v1/backups/${encodeURIComponent(name)}${location.search}`,'_blank')}
+function download(name:string){window.open(authorizedDownloadUrl(`/backups/${encodeURIComponent(name)}`),'_blank')}
 async function restore(upload:any){try{const content=await fileAsBase64(upload.raw);await api('/backups/restore',{method:'POST',...jsonBody({content})});ElMessage.success('数据已恢复，请重新打开应用')}catch(e:any){ElMessage.error(e.message)}}
 </script>
 
@@ -23,7 +23,7 @@ async function restore(upload:any){try{const content=await fileAsBase64(upload.r
     </div>
     <div class="panel backup-panel">
       <div class="panel-header"><div><strong>本地备份</strong><p class="muted">备份文件保存在 QuizVault 应用数据目录</p></div><div class="toolbar"><el-tooltip content="刷新"><el-button :icon="Refresh" circle @click="load" /></el-tooltip><el-button type="primary" :loading="creating" @click="backup">立即备份</el-button></div></div>
-      <el-table :data="backups"><el-table-column prop="filename" label="文件" min-width="280" /><el-table-column label="大小" width="130"><template #default="{row}">{{(row.size/1024).toFixed(1)}} KB</template></el-table-column><el-table-column label="创建时间" width="190"><template #default="{row}">{{new Date(row.created_at).toLocaleString()}}</template></el-table-column><el-table-column label="操作" width="80"><template #default="{row}"><el-tooltip content="导出备份"><el-button :icon="Download" circle plain @click="download(row.filename)" /></el-tooltip></template></el-table-column></el-table>
+      <el-table :data="backups"><el-table-column prop="filename" label="文件" min-width="280" /><el-table-column label="状态" width="110"><template #default="{row}"><el-tooltip :content="row.validation_error||`数据库版本：${row.revision}`"><el-tag :type="row.valid?'success':'danger'" effect="plain">{{row.valid?'有效':'无效'}}</el-tag></el-tooltip></template></el-table-column><el-table-column label="大小" width="130"><template #default="{row}">{{(row.size/1024).toFixed(1)}} KB</template></el-table-column><el-table-column label="创建时间" width="190"><template #default="{row}">{{new Date(row.created_at).toLocaleString()}}</template></el-table-column><el-table-column label="操作" width="80"><template #default="{row}"><el-tooltip :content="row.valid?'导出备份':'损坏备份不可导出'"><el-button :icon="Download" circle plain :disabled="!row.valid" @click="download(row.filename)" /></el-tooltip></template></el-table-column></el-table>
       <div v-if="!backups.length" class="empty">还没有备份</div>
     </div>
   </section>

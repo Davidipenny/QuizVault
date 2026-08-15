@@ -6,7 +6,7 @@ import { ElMessage } from 'element-plus'
 import { api, jsonBody } from '../api'
 import type { Question } from '../types'
 
-const route=useRoute(),router=useRouter(),loading=ref(true),session=ref<any>(null),index=ref(0),result=ref<any>(null),review=ref(false),noteDialog=ref(false),note=ref('')
+const route=useRoute(),router=useRouter(),loading=ref(true),session=ref<any>(null),index=ref(0),result=ref<any>(null),review=ref(false),revealed=ref(false),noteDialog=ref(false),note=ref('')
 const answer=reactive<any>({selected:[],value:true,values:[''],text:'',self_assessment:null})
 const states=reactive<Record<string,{favorite:boolean;flagged:boolean;note:string}>>({})
 const collections=ref<any[]>([]),collectionDialog=ref(false),newCollection=ref('')
@@ -15,11 +15,12 @@ const progress=computed(()=>session.value?Math.round((Math.min(index.value+1,ses
 const typeLabels:Record<string,string>={single:'单选题',multi:'多选题',any:'任意选',truefalse:'判断题',fill:'填空题',essay:'问答题'}
 const answered=computed(()=>session.value?.answers?.find((x:any)=>x.question_id===current.value?.id))
 const locked=computed(()=>!!result.value||review.value||!!answered.value)
+const shownAnswer=computed(()=>result.value||revealed.value?result.value||{correct_answer:current.value?.answer_spec,explanation:current.value?.explanation}:null)
 
 onMounted(load)
 async function load(){loading.value=true;try{[session.value,collections.value]=await Promise.all([api(`/quiz-sessions/${route.params.sessionId}`),api('/collections')]);Object.assign(states,Object.fromEntries(Object.entries(session.value.study_states||{}).map(([id,s]:any)=>[id,{favorite:s.favorite,flagged:s.flagged,note:s.note}])));index.value=Math.min(session.value.current_index,session.value.questions.length-1);restore()}catch(e:any){ElMessage.error(e.message);router.push('/quiz/setup')}finally{loading.value=false}}
-function reset(){Object.assign(answer,{selected:[],value:true,values:[''],text:'',self_assessment:null});result.value=null;review.value=false}
-function restore(){reset();const record=session.value?.answers?.find((x:any)=>x.question_id===current.value?.id);if(record){Object.assign(answer,JSON.parse(JSON.stringify(record.answer)));result.value={is_correct:record.is_correct,correct_answer:record.question_snapshot.answer_spec,explanation:record.question_snapshot.explanation};review.value=true}if(current.value?.type==='fill'&&!record){answer.values=(current.value.answer_spec?.blanks||['']).map(()=> '')}}
+function reset(){Object.assign(answer,{selected:[],value:true,values:[''],text:'',self_assessment:null});result.value=null;review.value=false;revealed.value=false}
+function restore(){reset();const record=session.value?.answers?.find((x:any)=>x.question_id===current.value?.id);if(record){Object.assign(answer,JSON.parse(JSON.stringify(record.answer)));result.value={is_correct:record.is_correct,correct_answer:record.question_snapshot.answer_spec,explanation:record.question_snapshot.explanation};review.value=true}if(current.value?.type==='fill'&&!record){answer.values=Array.from({length:Math.max(1,current.value.answer_meta?.blank_count||current.value.answer_spec?.blanks?.length||1)},()=> '')}}
 function selectChoice(label:string){if(locked.value)return;if(current.value?.type==='single')answer.selected=[label];else answer.selected=answer.selected.includes(label)?answer.selected.filter((x:string)=>x!==label):[...answer.selected,label]}
 async function submit(){if(!current.value)return;try{result.value=await api(`/quiz-sessions/${session.value.id}/answers`,{method:'POST',...jsonBody({question_id:current.value.id,answer})});session.value.answers=session.value.answers.filter((x:any)=>x.question_id!==current.value?.id);session.value.answers.push({question_id:current.value.id,answer:JSON.parse(JSON.stringify(answer)),is_correct:result.value.is_correct,question_snapshot:{...current.value,answer_spec:result.value.correct_answer,explanation:result.value.explanation}});if(session.value.config.auto_next&&result.value.is_correct)setTimeout(next,650)}catch(e:any){ElMessage.error(e.message)}}
 async function go(target:number){if(target<0||target>=session.value.questions.length)return;index.value=target;restore();await nextTick(()=>window.scrollTo({top:0,behavior:'smooth'}))}
@@ -30,7 +31,7 @@ function openNote(){const questionId=current.value?.id;if(!questionId)return;not
 async function saveNote(){await patchState({note:note.value});noteDialog.value=false}
 async function addToCollection(collectionId:string){const questionId=current.value?.id;if(!questionId)return;await api(`/collections/${collectionId}/questions`,{method:'POST',...jsonBody({question_id:questionId})});collectionDialog.value=false;ElMessage.success('已加入收藏夹')}
 async function createCollection(){if(!newCollection.value.trim())return;const created=await api<any>('/collections',{method:'POST',...jsonBody({name:newCollection.value})});collections.value.push(created);newCollection.value='';await addToCollection(created.id)}
-function expectedText(){if(!result.value)return'';const spec=result.value.correct_answer||{};if(current.value?.type==='truefalse')return spec.value?'正确':'错误';if(['single','multi','any'].includes(current.value?.type||''))return(spec.correct||[]).join('、');if(current.value?.type==='fill')return(spec.blanks||[]).map((x:string[])=>x.join(' / ')).join('；');return spec.reference||''}
+function expectedText(){if(!shownAnswer.value)return'';const spec=shownAnswer.value.correct_answer||{};if(current.value?.type==='truefalse')return spec.value?'正确':'错误';if(['single','multi','any'].includes(current.value?.type||''))return(spec.correct||[]).join('、');if(current.value?.type==='fill')return(spec.blanks||[]).map((x:string[])=>x.join(' / ')).join('；');return spec.reference||''}
 </script>
 
 <template>
@@ -55,15 +56,15 @@ function expectedText(){if(!result.value)return'';const spec=result.value.correc
       <div v-else-if="current.type==='truefalse'" class="binary"><el-radio-group v-model="answer.value" :disabled="locked" size="large"><el-radio-button :value="true">正确</el-radio-button><el-radio-button :value="false">错误</el-radio-button></el-radio-group></div>
       <div v-else-if="current.type==='fill'" class="fill-list"><el-input v-for="(_,i) in answer.values" :key="i" v-model="answer.values[i]" :disabled="locked" :placeholder="`第 ${Number(i)+1} 空`"><template #prepend>{{Number(i)+1}}</template></el-input></div>
       <div v-else class="essay"><el-input v-model="answer.text" type="textarea" :rows="8" :disabled="locked" placeholder="输入你的答案" /><div v-if="!session.config.compare_essay" class="self-assess"><span>自我评价</span><el-segmented v-model="answer.self_assessment" :disabled="locked" :options="[{label:'掌握',value:true},{label:'未掌握',value:false}]" /></div></div>
-      <div v-if="result" class="feedback" :class="result.is_correct===true?'correct':result.is_correct===false?'wrong':'neutral'">
-        <strong>{{result.is_correct===true?'回答正确':result.is_correct===false?'回答错误':'已记录'}}</strong>
+      <div v-if="shownAnswer" class="feedback" :class="result?.is_correct===true?'correct':result?.is_correct===false?'wrong':'neutral'">
+        <strong>{{revealed&&!result?'参考答案':result?.is_correct===true?'回答正确':result?.is_correct===false?'回答错误':'已记录'}}</strong>
         <div><span class="feedback-label">参考答案</span><span class="question-text">{{expectedText()}}</span></div>
-        <div v-if="result.explanation"><span class="feedback-label">解析</span><span class="question-text">{{result.explanation}}</span></div>
+        <div v-if="shownAnswer.explanation"><span class="feedback-label">解析</span><span class="question-text">{{shownAnswer.explanation}}</span></div>
       </div>
     </main>
     <footer v-if="current" class="quiz-footer">
       <el-button :icon="ArrowLeft" :disabled="index===0" @click="prev">上一题</el-button>
-      <el-button v-if="!locked" type="primary" size="large" @click="submit">提交答案</el-button>
+      <div v-if="!locked" class="toolbar"><el-button v-if="session.config.study_mode&&!revealed" @click="revealed=true">查看答案</el-button><el-button type="primary" size="large" @click="submit">提交答案</el-button></div>
       <el-button v-else type="primary" size="large" @click="next">{{index===session.questions.length-1?'查看学习记录':'下一题'}}<el-icon class="el-icon--right"><ArrowRight /></el-icon></el-button>
     </footer>
     <el-dialog v-model="noteDialog" title="题目笔记" width="min(560px,92vw)"><el-input v-model="note" type="textarea" :rows="8" placeholder="记录思路或易错点" /><template #footer><el-button @click="noteDialog=false">取消</el-button><el-button type="primary" @click="saveNote">保存笔记</el-button></template></el-dialog>

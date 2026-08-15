@@ -712,10 +712,11 @@ def get_quiz_session(session_id: str, db: Session = Depends(get_db)):
     by_id = {q.id: q for q in questions}
     question_items = []
     option_orders = session.config.get("_option_orders", {})
+    study_mode = bool(session.config.get("study_mode"))
     for qid in session.question_order:
         if qid not in by_id:
             continue
-        item = question_dict(by_id[qid], include_answer=False)
+        item = question_dict(by_id[qid], include_answer=study_mode)
         order = option_orders.get(qid, [])
         if order:
             rank = {label: index for index, label in enumerate(order)}
@@ -780,6 +781,27 @@ def update_session(session_id: str, payload: dict, db: Session = Depends(get_db)
 @app.get(f"{API_PREFIX}/study-states")
 def list_states(kind: str = "all", bank_id: str = "", page: int = 1, page_size: int = 50, db: Session = Depends(get_db)):
     user = local_user(db)
+    if kind == "unanswered":
+        join_condition = and_(StudyState.question_id == Question.id, StudyState.user_id == user.id)
+        statement = select(Question, StudyState).outerjoin(StudyState, join_condition).where(StudyState.last_answered_at.is_(None))
+        if bank_id:
+            statement = statement.where(Question.bank_id == bank_id)
+        total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
+        rows = db.execute(statement.order_by(Question.sort_order, Question.created_at).offset((page - 1) * page_size).limit(page_size)).all()
+        return {
+            "items": [{
+                "id": state.id if state else None,
+                "question_id": question.id,
+                "wrong_count": state.wrong_count if state else 0,
+                "favorite": state.favorite if state else False,
+                "note": state.note if state else "",
+                "flagged": state.flagged if state else False,
+                "last_answered_at": None,
+                "mastery": state.mastery if state else "new",
+                "question": question_dict(question),
+            } for question, state in rows],
+            "total": total,
+        }
     filters = [StudyState.user_id == user.id]
     if kind == "wrong": filters.append(StudyState.wrong_count > 0)
     if kind == "favorite": filters.append(StudyState.favorite.is_(True))
