@@ -148,6 +148,15 @@ class ImportJob(Base):
     committed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class ImportErrorRecord(Base):
+    __tablename__ = "import_errors"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    job_id: Mapped[str] = mapped_column(ForeignKey("import_jobs.id", ondelete="CASCADE"), index=True)
+    row_number: Mapped[int] = mapped_column(Integer)
+    messages: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
 class LegacyMapping(Base):
     __tablename__ = "legacy_mappings"
     legacy_key: Mapped[str] = mapped_column(String(600), primary_key=True)

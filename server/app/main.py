@@ -9,6 +9,7 @@ import io
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,14 +21,19 @@ from sqlalchemy.orm import Session, selectinload
 
 from .config import API_PREFIX, APP_NAME, data_dir, database_path, frontend_dist_dir, legacy_banks_dir
 from .backups import MAX_BACKUP_SIZE, backup_info, create_backup as create_database_backup, restore_database, validate_database
-from .database import Base, engine, get_db
+from .database import engine, get_db, run_migrations
 from .domain import grade_answer, question_fingerprint, validate_question
 from .importers import normalize_type, parse_source, scan_legacy_bank
 from .models import (
-    Choice, Collection, CollectionQuestion, ImportJob, LegacyMapping, Question,
+    Choice, Collection, CollectionQuestion, ImportErrorRecord, ImportJob, LegacyMapping, Question,
     QuestionBank, QuizAnswer, QuizSession, StudyState, User, Workspace, now,
 )
 from .serializers import bank_dict, question_dict, session_dict, state_dict
+from .schemas import (
+    AnswerSubmit, BankCreate, BankMerge, BankUpdate, BatchQuestions, CollectionCreate,
+    CollectionQuestionAdd, CollectionUpdate, ImportEdit, ImportPreview, LegacyCommit,
+    QuestionRequest, QuizSessionCreate, QuizSessionUpdate, RestoreRequest, StudyStateUpdate,
+)
 
 
 @asynccontextmanager
@@ -57,7 +63,7 @@ async def local_token_guard(request: Request, call_next):
 
 
 def initialize_database():
-    Base.metadata.create_all(engine)
+    run_migrations()
     with Session(engine) as db:
         workspace = db.scalar(select(Workspace).limit(1))
         if not workspace:
@@ -136,7 +142,8 @@ def list_banks(include_archived: bool = False, db: Session = Depends(get_db)):
 
 
 @app.post(f"{API_PREFIX}/banks", status_code=201)
-def add_bank(payload: dict, db: Session = Depends(get_db)):
+def add_bank(payload: BankCreate, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     name = str(payload.get("name", "")).strip()
     if not name:
         raise HTTPException(422, "题库名称不能为空")
@@ -155,7 +162,8 @@ def add_bank(payload: dict, db: Session = Depends(get_db)):
 
 
 @app.patch(f"{API_PREFIX}/banks/{{bank_id}}")
-def update_bank(bank_id: str, payload: dict, db: Session = Depends(get_db)):
+def update_bank(bank_id: str, payload: BankUpdate, db: Session = Depends(get_db)):
+    payload = payload.model_dump(exclude_unset=True)
     bank = get_bank(db, bank_id)
     for field in ("name", "description", "tags", "challenge_size", "archived"):
         if field in payload:
@@ -172,7 +180,8 @@ def delete_bank(bank_id: str, db: Session = Depends(get_db)):
 
 
 @app.post(f"{API_PREFIX}/banks/{{bank_id}}/merge")
-def merge_bank(bank_id: str, payload: dict, db: Session = Depends(get_db)):
+def merge_bank(bank_id: str, payload: BankMerge, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     target = get_bank(db, bank_id)
     source = get_bank(db, payload.get("source_bank_id", ""))
     copied = skipped = 0
@@ -209,7 +218,8 @@ def list_questions(
 
 
 @app.post(f"{API_PREFIX}/banks/{{bank_id}}/questions", status_code=201)
-def add_question(bank_id: str, payload: dict, db: Session = Depends(get_db)):
+def add_question(bank_id: str, payload: QuestionRequest, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     get_bank(db, bank_id)
     try:
         question = create_question(db, bank_id, payload)
@@ -224,7 +234,8 @@ def add_question(bank_id: str, payload: dict, db: Session = Depends(get_db)):
 
 
 @app.put(f"{API_PREFIX}/questions/{{question_id}}")
-def update_question(question_id: str, payload: dict, db: Session = Depends(get_db)):
+def update_question(question_id: str, payload: QuestionRequest, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     question = get_question(db, question_id)
     errors = validate_question(payload)
     if errors:
@@ -255,7 +266,8 @@ def delete_question(question_id: str, db: Session = Depends(get_db)):
 
 
 @app.post(f"{API_PREFIX}/questions/batch")
-def batch_questions(payload: dict, db: Session = Depends(get_db)):
+def batch_questions(payload: BatchQuestions, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     ids = payload.get("question_ids", [])
     action = payload.get("action")
     questions = db.scalars(select(Question).where(Question.id.in_(ids)).options(selectinload(Question.choices))).all()
@@ -282,7 +294,8 @@ def batch_questions(payload: dict, db: Session = Depends(get_db)):
 
 
 @app.post(f"{API_PREFIX}/imports/preview", status_code=201)
-def preview_import(payload: dict, db: Session = Depends(get_db)):
+def preview_import(payload: ImportPreview, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     bank = get_bank(db, payload.get("bank_id", ""))
     try:
         rows = parse_source(payload.get("source_type", "text"), payload.get("content", ""), payload.get("filename", ""))
@@ -312,6 +325,9 @@ def preview_import(payload: dict, db: Session = Depends(get_db)):
         errors=errors, stats={"total": len(rows), "valid": valid, "invalid": len(rows) - valid},
     )
     db.add(job)
+    db.flush()
+    for error in errors:
+        db.add(ImportErrorRecord(job_id=job.id, row_number=error["row"], messages=error["messages"]))
     db.commit()
     return {"id": job.id, "rows": rows, "errors": errors, "stats": job.stats, "status": job.status}
 
@@ -333,25 +349,41 @@ def excel_template():
 
 
 @app.patch(f"{API_PREFIX}/imports/{{job_id}}")
-def edit_import(job_id: str, payload: dict, db: Session = Depends(get_db)):
+def edit_import(job_id: str, payload: ImportEdit, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     job = db.get(ImportJob, job_id)
     if not job or job.status != "preview":
         raise HTTPException(404, "导入预览不存在或已提交")
     rows = payload.get("rows", job.rows)
     errors = []
+    existing = set(db.scalars(select(Question.fingerprint).where(Question.bank_id == job.bank_id)).all())
+    seen: set[str] = set()
     for index, row in enumerate(rows, 1):
-        row["_errors"] = [] if row.get("_excluded") else validate_question(row)
+        row_errors = [] if row.get("_excluded") else validate_question(row)
+        fingerprint = question_fingerprint(row)
+        if not row.get("_excluded") and (fingerprint in existing or fingerprint in seen):
+            row_errors.append("重复题目")
+        row["_fingerprint"] = fingerprint
+        row["_row"] = index
+        row["_errors"] = row_errors
+        seen.add(fingerprint)
         if row["_errors"]:
             errors.append({"row": index, "messages": row["_errors"]})
     job.rows = rows
     job.errors = errors
     job.stats = {"total": len(rows), "valid": sum(not r.get("_excluded") and not r.get("_errors") for r in rows), "invalid": len(errors), "excluded": sum(bool(r.get("_excluded")) for r in rows)}
+    for record in db.scalars(select(ImportErrorRecord).where(ImportErrorRecord.job_id == job.id)).all():
+        db.delete(record)
+    for error in errors:
+        db.add(ImportErrorRecord(job_id=job.id, row_number=error["row"], messages=error["messages"]))
     db.commit()
     return {"id": job.id, "rows": job.rows, "errors": job.errors, "stats": job.stats}
 
 
 @app.post(f"{API_PREFIX}/imports/{{job_id}}/commit")
 def commit_import(job_id: str, db: Session = Depends(get_db)):
+    if db.bind and db.bind.dialect.name == "sqlite":
+        db.connection().exec_driver_sql("BEGIN IMMEDIATE")
     job = db.get(ImportJob, job_id)
     if not job:
         raise HTTPException(404, "导入任务不存在")
@@ -375,11 +407,17 @@ def commit_import(job_id: str, db: Session = Depends(get_db)):
 
 
 @app.get(f"{API_PREFIX}/imports/{{job_id}}/errors")
-def import_errors(job_id: str, db: Session = Depends(get_db)):
+def import_errors(job_id: str, download: bool = False, db: Session = Depends(get_db)):
     job = db.get(ImportJob, job_id)
     if not job:
         raise HTTPException(404, "导入任务不存在")
-    return {"job_id": job.id, "source_type": job.source_type, "errors": job.errors, "stats": job.stats}
+    records = db.scalars(select(ImportErrorRecord).where(ImportErrorRecord.job_id == job.id).order_by(ImportErrorRecord.row_number)).all()
+    errors = [{"row": record.row_number, "messages": record.messages} for record in records]
+    result = {"job_id": job.id, "source_type": job.source_type, "errors": errors, "stats": job.stats}
+    if download:
+        content = json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8")
+        return Response(content=content, media_type="application/json", headers={"Content-Disposition": f'attachment; filename="import-errors-{job.id}.json"'})
+    return result
 
 
 @app.get(f"{API_PREFIX}/migration/legacy/preview")
@@ -499,7 +537,8 @@ def _analyze_legacy_states(folder: Path, candidates: dict[tuple, list[dict]]) ->
 
 
 @app.post(f"{API_PREFIX}/migration/legacy/commit")
-def legacy_commit(payload: dict, db: Session = Depends(get_db)):
+def legacy_commit(payload: LegacyCommit, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     root = Path(payload.get("path") or legacy_banks_dir())
     if not root.exists():
         raise HTTPException(404, "旧版目录不存在")
@@ -657,7 +696,8 @@ def migrate_legacy_states(db: Session, user_id: str, bank_id: str, folder: Path,
 
 
 @app.post(f"{API_PREFIX}/quiz-sessions", status_code=201)
-def create_quiz_session(payload: dict, db: Session = Depends(get_db)):
+def create_quiz_session(payload: QuizSessionCreate, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     bank_id = payload.get("bank_id", "")
     get_bank(db, bank_id)
     user = local_user(db)
@@ -728,9 +768,10 @@ def get_quiz_session(session_id: str, db: Session = Depends(get_db)):
 
 
 @app.post(f"{API_PREFIX}/quiz-sessions/{{session_id}}/answers")
-def submit_answer(session_id: str, payload: dict, db: Session = Depends(get_db)):
+def submit_answer(session_id: str, payload: AnswerSubmit, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     session = db.get(QuizSession, session_id)
-    if not session or session.status != "active":
+    if not session:
         raise HTTPException(404, "活动会话不存在")
     question = get_question(db, payload.get("question_id", ""))
     if question.id not in session.question_order:
@@ -739,6 +780,9 @@ def submit_answer(session_id: str, payload: dict, db: Session = Depends(get_db))
     answer = payload.get("answer", {})
     result = grade_answer(question_dict(question), answer, bool(session.config.get("compare_essay")))
     existing = db.scalar(select(QuizAnswer).where(and_(QuizAnswer.session_id == session.id, QuizAnswer.question_id == question.id)))
+    if session.status != "active" and not existing:
+        raise HTTPException(404, "活动会话不存在")
+    previous_wrong = int(bool(existing and existing.is_correct is False))
     snapshot = question_dict(question)
     if existing:
         existing.answer, existing.is_correct, existing.question_snapshot = answer, result, snapshot
@@ -751,11 +795,10 @@ def submit_answer(session_id: str, payload: dict, db: Session = Depends(get_db))
         state = StudyState(user_id=user.id, question_id=question.id, wrong_count=0, favorite=False, note="", flagged=False, mastery="new")
         db.add(state)
     state.last_answered_at = now()
+    state.wrong_count = max(0, state.wrong_count + int(result is False) - previous_wrong)
     if result is False:
-        state.wrong_count += 1
         state.mastery = "learning"
     elif result is True:
-        state.wrong_count = max(0, state.wrong_count - 1)
         state.mastery = "mastered" if state.wrong_count == 0 else "learning"
     index = session.question_order.index(question.id)
     session.current_index = max(session.current_index, index + 1)
@@ -766,7 +809,8 @@ def submit_answer(session_id: str, payload: dict, db: Session = Depends(get_db))
 
 
 @app.patch(f"{API_PREFIX}/quiz-sessions/{{session_id}}")
-def update_session(session_id: str, payload: dict, db: Session = Depends(get_db)):
+def update_session(session_id: str, payload: QuizSessionUpdate, db: Session = Depends(get_db)):
+    payload = payload.model_dump(exclude_unset=True)
     session = db.get(QuizSession, session_id)
     if not session:
         raise HTTPException(404, "会话不存在")
@@ -779,7 +823,7 @@ def update_session(session_id: str, payload: dict, db: Session = Depends(get_db)
 
 
 @app.get(f"{API_PREFIX}/study-states")
-def list_states(kind: str = "all", bank_id: str = "", page: int = 1, page_size: int = 50, db: Session = Depends(get_db)):
+def list_states(kind: Literal["all", "wrong", "favorite", "note", "flagged", "unanswered"] = "all", bank_id: str = "", page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200), db: Session = Depends(get_db)):
     user = local_user(db)
     if kind == "unanswered":
         join_condition = and_(StudyState.question_id == Question.id, StudyState.user_id == user.id)
@@ -816,7 +860,8 @@ def list_states(kind: str = "all", bank_id: str = "", page: int = 1, page_size: 
 
 
 @app.patch(f"{API_PREFIX}/study-states/{{question_id}}")
-def update_state(question_id: str, payload: dict, db: Session = Depends(get_db)):
+def update_state(question_id: str, payload: StudyStateUpdate, db: Session = Depends(get_db)):
+    payload = payload.model_dump(exclude_unset=True)
     get_question(db, question_id)
     user = local_user(db)
     state = db.scalar(select(StudyState).where(and_(StudyState.user_id == user.id, StudyState.question_id == question_id)))
@@ -847,7 +892,8 @@ def collection_questions(collection_id: str, db: Session = Depends(get_db)):
 
 
 @app.patch(f"{API_PREFIX}/collections/{{collection_id}}")
-def update_collection(collection_id: str, payload: dict, db: Session = Depends(get_db)):
+def update_collection(collection_id: str, payload: CollectionUpdate, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     collection = db.get(Collection, collection_id)
     if not collection:
         raise HTTPException(404, "收藏夹不存在")
@@ -866,7 +912,8 @@ def delete_collection(collection_id: str, db: Session = Depends(get_db)):
 
 
 @app.post(f"{API_PREFIX}/collections", status_code=201)
-def add_collection(payload: dict, db: Session = Depends(get_db)):
+def add_collection(payload: CollectionCreate, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     user = local_user(db)
     collection = Collection(user_id=user.id, name=str(payload.get("name", "")).strip())
     if not collection.name:
@@ -879,7 +926,8 @@ def add_collection(payload: dict, db: Session = Depends(get_db)):
 
 
 @app.post(f"{API_PREFIX}/collections/{{collection_id}}/questions")
-def add_collection_question(collection_id: str, payload: dict, db: Session = Depends(get_db)):
+def add_collection_question(collection_id: str, payload: CollectionQuestionAdd, db: Session = Depends(get_db)):
+    payload = payload.model_dump()
     if not db.get(Collection, collection_id): raise HTTPException(404, "收藏夹不存在")
     get_question(db, payload.get("question_id", ""))
     item = CollectionQuestion(collection_id=collection_id, question_id=payload["question_id"])
@@ -912,7 +960,7 @@ def stats(db: Session = Depends(get_db)):
 
 
 @app.get(f"{API_PREFIX}/quiz-answers")
-def answer_history(bank_id: str = "", page: int = 1, page_size: int = 50, db: Session = Depends(get_db)):
+def answer_history(bank_id: str = "", page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200), db: Session = Depends(get_db)):
     user = local_user(db)
     filters = [QuizSession.user_id == user.id]
     if bank_id:
@@ -950,7 +998,8 @@ def download_backup(filename: str):
 
 
 @app.post(f"{API_PREFIX}/backups/restore")
-def restore_backup(payload: dict):
+def restore_backup(payload: RestoreRequest):
+    payload = payload.model_dump()
     encoded = payload.get("content", "")
     if not encoded:
         raise HTTPException(422, "备份内容为空")
@@ -966,6 +1015,7 @@ def restore_backup(payload: dict):
     try:
         temp_path.write_bytes(raw)
         restore_database(temp_path, database_path(), data_dir() / "backups", engine.dispose)
+        run_migrations()
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     finally:

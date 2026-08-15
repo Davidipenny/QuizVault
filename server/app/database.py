@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
+import sqlite3
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from .config import database_path
+from .config import alembic_ini_path, alembic_script_dir, database_path
 
 
 class Base(DeclarativeBase):
@@ -34,6 +37,19 @@ engine = make_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, class_=Session)
 
 
+def run_migrations() -> None:
+    path = database_path()
+    configuration = Config(str(alembic_ini_path()))
+    configuration.set_main_option("script_location", str(alembic_script_dir()))
+    configuration.set_main_option("sqlalchemy.url", f"sqlite:///{path.as_posix()}")
+    if path.exists():
+        with closing(sqlite3.connect(path)) as connection:
+            tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "question_banks" in tables and "alembic_version" not in tables:
+            command.stamp(configuration, "0001")
+    command.upgrade(configuration, "head")
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -53,4 +69,3 @@ def session_scope():
         raise
     finally:
         db.close()
-

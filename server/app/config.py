@@ -37,6 +37,14 @@ def frontend_dist_dir() -> Path:
     return application_root() / "web" / "dist"
 
 
+def alembic_ini_path() -> Path:
+    return application_root() / "server" / "alembic.ini"
+
+
+def alembic_script_dir() -> Path:
+    return application_root() / "server" / "alembic"
+
+
 def legacy_banks_dir() -> Path:
     override = os.getenv("QUIZVAULT_LEGACY_BANKS")
     if override:

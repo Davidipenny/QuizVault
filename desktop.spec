@@ -5,6 +5,7 @@ root = Path(SPECPATH)
 datas = [
     (str(root / "web" / "dist"), "web/dist"),
     (str(root / "server" / "alembic"), "server/alembic"),
+    (str(root / "server" / "alembic.ini"), "server"),
     (str(root / "parse_markdown.py"), "."),
 ]
 

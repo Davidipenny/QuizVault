@@ -1,9 +1,6 @@
-import os
 import tempfile
 import json
 from pathlib import Path
-
-os.environ["QUIZVAULT_DATA_DIR"] = tempfile.mkdtemp(prefix="quizvault-test-")
 
 from fastapi.testclient import TestClient
 
@@ -52,14 +49,14 @@ def test_end_to_end_local_flow():
         assert "is_correct" not in session["questions"][0]["choices"][0]
         answer = client.post(f"/api/v1/quiz-sessions/{quiz['id']}/answers", json={"question_id": question["id"], "answer": {"selected": ["B"]}}).json()
         assert answer["is_correct"] is False
-        states = client.get("/api/v1/study-states?kind=wrong").json()
+        states = client.get("/api/v1/study-states", params={"kind": "wrong", "bank_id": bank["id"]}).json()
         assert states["total"] == 1
 
         collection = client.post("/api/v1/collections", json={"name": "重点"}).json()
         assert client.post(f"/api/v1/collections/{collection['id']}/questions", json={"question_id": question["id"]}).status_code == 200
         saved = client.get(f"/api/v1/collections/{collection['id']}/questions").json()
         assert saved["items"][0]["id"] == question["id"]
-        history = client.get("/api/v1/quiz-answers").json()
+        history = client.get("/api/v1/quiz-answers", params={"bank_id": bank["id"]}).json()
         assert history["total"] == 1
         assert history["items"][0]["is_correct"] is False
         template = client.get("/api/v1/imports/template/excel")

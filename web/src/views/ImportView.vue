@@ -27,13 +27,15 @@ async function preview() {
 }
 async function commit() {
   try {
-    await api(`/imports/${job.value.id}`, { method:'PATCH', ...jsonBody({ rows:job.value.rows }) })
+    job.value = await api(`/imports/${job.value.id}`, { method:'PATCH', ...jsonBody({ rows:job.value.rows }) })
+    if (job.value.stats.invalid) return ElMessage.warning('请先修正或排除有问题的题目')
     const result = await api<any>(`/imports/${job.value.id}/commit`, { method:'POST' })
     ElMessage.success(`已导入 ${result.committed} 道题`); job.value=null; await store.loadBanks()
   } catch(error:any) { ElMessage.error(error.message) }
 }
 function chooseFile(upload:any) { file.value = upload.raw }
 function downloadTemplate() { window.open(authorizedDownloadUrl('/imports/template/excel'), '_blank') }
+function downloadErrors() { window.open(authorizedDownloadUrl(`/imports/${job.value.id}/errors?download=true`), '_blank') }
 async function previewLegacy() { try { legacy.value=await api('/migration/legacy/preview') } catch(error:any) { ElMessage.error(error.message) } }
 async function commitLegacy() { try { const r=await api<any>('/migration/legacy/commit',{method:'POST',...jsonBody({})}); ElMessage.success(`迁移完成：新增 ${r.banks} 个题库、${r.questions} 道题`); await store.loadBanks(); await previewLegacy() } catch(error:any) { ElMessage.error(error.message) } }
 </script>
@@ -64,7 +66,7 @@ async function commitLegacy() { try { const r=await api<any>('/migration/legacy/
         </div>
       </div>
       <div v-if="job" class="panel preview">
-        <div class="panel-header"><div><strong>导入预览</strong><span class="muted summary">共 {{job.stats.total}} · 可导入 {{job.stats.valid}} · 有问题 {{job.stats.invalid}}</span></div><el-button type="primary" @click="commit">提交导入</el-button></div>
+        <div class="panel-header"><div><strong>导入预览</strong><span class="muted summary">共 {{job.stats.total}} · 可导入 {{job.stats.valid}} · 有问题 {{job.stats.invalid}}</span></div><div class="toolbar"><el-button v-if="job.stats.invalid" @click="downloadErrors">下载错误报告</el-button><el-button type="primary" @click="commit">提交导入</el-button></div></div>
         <el-table :data="job.rows" max-height="460">
           <el-table-column label="导入" width="72"><template #default="{row}"><el-checkbox v-model="row._excluded" :true-value="false" :false-value="true" /></template></el-table-column>
           <el-table-column prop="_row" label="行" width="60" />
