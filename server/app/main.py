@@ -475,7 +475,8 @@ def _legacy_directory_key(folder: Path) -> str:
 def _legacy_key(folder: Path, item: dict) -> str:
     directory = _legacy_directory_key(folder)
     source = str(item.get("_legacy_source") or item.get("source") or "")
-    return f"{directory}|{source}|{item.get('_legacy_id')}|{item['type']}"
+    fingerprint = question_fingerprint(item)
+    return f"{directory}|{source}|{item.get('_legacy_id')}|{item['type']}|{fingerprint}"
 
 
 def _legacy_candidates(items: list[dict]) -> dict[tuple, list[dict]]:

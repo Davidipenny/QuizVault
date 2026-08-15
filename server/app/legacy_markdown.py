@@ -14,13 +14,16 @@ def parse_markdown(text: str) -> list[dict[str, Any]]:
         if not block:
             continue
 
+        explicit_choice_type = False
         header_match = re.search(r"^#+\s*(.+)", block, re.MULTILINE)
         if header_match:
             header_text = header_match.group(1).strip().lower()
             if "单选" in header_text or "single" in header_text:
                 current_type = "single"
+                explicit_choice_type = True
             elif "多选" in header_text or "multiple" in header_text:
                 current_type = "multi"
+                explicit_choice_type = True
             elif "判断" in header_text or "truefalse" in header_text:
                 current_type = "truefalse"
             if not re.search(r"\*\*\d+\.", block):
@@ -30,8 +33,10 @@ def parse_markdown(text: str) -> list[dict[str, Any]]:
             continue
         if "<!-- single -->" in block:
             current_type = "single"
+            explicit_choice_type = True
         elif "<!-- multi -->" in block:
             current_type = "multi"
+            explicit_choice_type = True
         elif "<!-- truefalse -->" in block:
             current_type = "truefalse"
 
@@ -56,10 +61,16 @@ def parse_markdown(text: str) -> list[dict[str, Any]]:
             current_question["answer"] = answer_match.group(1)
             if len(current_question["answer"]) > 1 and current_question["type"] == "single":
                 current_question["type"] = "multi"
+            elif len(current_question["answer"]) == 1 and current_question["type"] == "multi" and not explicit_choice_type:
+                current_question["type"] = "single"
 
         explanation_match = re.search(r"\*\*解析：\*\*\s*(.+?)(?=\n---|\n##|$)", block, re.DOTALL)
         if explanation_match and current_question:
             current_question["explanation"] = explanation_match.group(1).strip()
+
+        section_markers = re.findall(r"[一二三四五六七八九十]+、\s*(单项|多项)选择题", block)
+        if section_markers:
+            current_type = "single" if section_markers[-1] == "单项" else "multi"
 
     if current_question:
         questions.append(current_question)

@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from app.database import SessionLocal
 from app.main import app, auto_import_legacy_banks
+from app.legacy_markdown import parse_markdown
 from app.models import Collection, LegacyMapping, Question, QuestionBank, QuizAnswer, QuizSession, StudyState
 
 
@@ -97,7 +98,8 @@ def test_startup_bank_import_is_automatic_and_idempotent(tmp_path, monkeypatch):
     folder = root / "自动识别题库"
     folder.mkdir(parents=True)
     folder.joinpath("questions.md").write_text(
-        "## 单选题\n\n**1. 自动导入题（　）**\nA. 甲\nB. 乙\n\n**答案：A**",
+        "## 单选题\n\n**1. 自动导入题（　）**\nA. 甲\nB. 乙\n\n**答案：A**\n\n"
+        "---\n\n**1. 重复题号仍需导入（　）**\nA. 丙\nB. 丁\n\n**答案：B**",
         encoding="utf-8",
     )
     monkeypatch.setenv("QUIZVAULT_LEGACY_BANKS", str(root))
@@ -105,10 +107,19 @@ def test_startup_bank_import_is_automatic_and_idempotent(tmp_path, monkeypatch):
     first = auto_import_legacy_banks()
     repeated = auto_import_legacy_banks()
 
-    assert first and first["banks"] == 1 and first["questions"] == 1
+    assert first and first["banks"] == 1 and first["questions"] == 2
     assert repeated and repeated["banks"] == 0 and repeated["questions"] == 0
     with SessionLocal() as db:
         bank = db.scalar(select(QuestionBank).where(QuestionBank.name == folder.name))
         assert bank.description == "由本地 banks 自动导入"
-        assert len(db.scalars(select(Question).where(Question.bank_id == bank.id)).all()) == 1
-        assert len(db.scalars(select(LegacyMapping).where(LegacyMapping.question_id.in_(select(Question.id).where(Question.bank_id == bank.id)))).all()) == 1
+        assert len(db.scalars(select(Question).where(Question.bank_id == bank.id)).all()) == 2
+        assert len(db.scalars(select(LegacyMapping).where(LegacyMapping.question_id.in_(select(Question.id).where(Question.bank_id == bank.id)))).all()) == 2
+
+
+def test_markdown_embedded_choice_section_header_applies_to_next_question():
+    questions = parse_markdown(
+        "## 多选题\n\n**1. 多选题（　）**\nA. 甲\nB. 乙\nC. 丙\nD. 丁第十章一、单项选择题\n\n**答案：AB**\n\n"
+        "---\n\n**2. 标题缺失的单选题（　）**\nA. 丙\nB. 丁\n\n**答案：A**"
+    )
+
+    assert [question["type"] for question in questions] == ["multi", "single"]
