@@ -10,6 +10,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:8765',
     headless: true,
+    channel: process.env.QV_E2E_CHANNEL || undefined,
     trace: 'retain-on-failure',
   },
 })

@@ -65,7 +65,7 @@ function downloadErrors() { window.open(authorizedDownloadUrl(`/imports/${job.va
       <div v-if="job" class="panel preview">
         <div class="panel-header"><div><strong>导入预览</strong><span class="muted summary">共 {{job.stats.total}} · 可导入 {{job.stats.valid}} · 有问题 {{job.stats.invalid}}</span></div><div class="toolbar"><el-button v-if="job.stats.invalid" @click="downloadErrors">下载错误报告</el-button><el-button type="primary" @click="commit">提交导入</el-button></div></div>
         <el-table :data="job.rows" max-height="460">
-          <el-table-column label="导入" width="72"><template #default="{row}"><el-checkbox v-model="row._excluded" :true-value="false" :false-value="true" /></template></el-table-column>
+          <el-table-column label="导入" width="72"><template #default="{row}"><el-checkbox :model-value="!row._excluded" @change="row._excluded = !Boolean($event)" /></template></el-table-column>
           <el-table-column prop="_row" label="行" width="60" />
           <el-table-column prop="type" label="题型" width="90" />
           <el-table-column label="题干" min-width="320"><template #default="{row}"><el-input v-model="row.prompt" /></template></el-table-column>

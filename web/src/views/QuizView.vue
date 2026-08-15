@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, Back, EditPen, Flag, FolderAdd, Star } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -18,7 +18,8 @@ const locked=computed(()=>!!result.value||review.value||!!answered.value)
 const shownAnswer=computed(()=>result.value||revealed.value?result.value||{correct_answer:current.value?.answer_spec,explanation:current.value?.explanation}:null)
 
 onMounted(load)
-async function load(){loading.value=true;try{[session.value,collections.value]=await Promise.all([api(`/quiz-sessions/${route.params.sessionId}`),api('/collections')]);Object.assign(states,Object.fromEntries(Object.entries(session.value.study_states||{}).map(([id,s]:any)=>[id,{favorite:s.favorite,flagged:s.flagged,note:s.note}])));index.value=Math.min(session.value.current_index,session.value.questions.length-1);restore()}catch(e:any){ElMessage.error(e.message);router.push('/quiz/setup')}finally{loading.value=false}}
+watch(()=>route.params.sessionId,(sessionId,previousId)=>{if(sessionId!==previousId)load()})
+async function load(){const sessionId=String(route.params.sessionId);loading.value=true;session.value=null;index.value=0;reset();try{[session.value,collections.value]=await Promise.all([api(`/quiz-sessions/${sessionId}`),api('/collections')]);Object.assign(states,Object.fromEntries(Object.entries(session.value.study_states||{}).map(([id,s]:any)=>[id,{favorite:s.favorite,flagged:s.flagged,note:s.note}])));index.value=Math.min(session.value.current_index,session.value.questions.length-1);restore()}catch(e:any){ElMessage.error(e.message);router.push('/quiz/setup')}finally{loading.value=false}}
 function reset(){Object.assign(answer,{selected:[],value:true,values:[''],text:'',self_assessment:null});result.value=null;review.value=false;revealed.value=false}
 function restore(){reset();const record=session.value?.answers?.find((x:any)=>x.question_id===current.value?.id);if(record){Object.assign(answer,JSON.parse(JSON.stringify(record.answer)));result.value={is_correct:record.is_correct,correct_answer:record.question_snapshot.answer_spec,explanation:record.question_snapshot.explanation};review.value=true}if(current.value?.type==='fill'&&!record){answer.values=Array.from({length:Math.max(1,current.value.answer_meta?.blank_count||current.value.answer_spec?.blanks?.length||1)},()=> '')}}
 function selectChoice(label:string){if(locked.value)return;if(current.value?.type==='single')answer.selected=[label];else answer.selected=answer.selected.includes(label)?answer.selected.filter((x:string)=>x!==label):[...answer.selected,label]}

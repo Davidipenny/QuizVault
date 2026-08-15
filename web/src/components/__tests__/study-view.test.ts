@@ -30,7 +30,7 @@ describe('StudyView', () => {
   it('loads the unanswered question filter from its dedicated tab', async () => {
     const wrapper = mount(StudyView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
-    await wrapper.findAll('button').find(button => button.text().includes('未做题'))!.trigger('click')
+    wrapper.findComponent({ name: 'ElSegmented' }).vm.$emit('update:modelValue', 'unanswered')
     await flushPromises()
 
     expect(mocks.api.mock.calls.some(call => String(call[0]).includes('kind=unanswered'))).toBe(true)
