@@ -23,8 +23,12 @@ Imports must retain the preview, row validation, deduplication, and atomic commi
 ./scripts/dev.ps1
 cd server; ../.venv/Scripts/python -m pytest tests -v
 cd web; pnpm test; pnpm build
+cd web; pnpm run test:e2e:install
+cd web; pnpm test:e2e
 .venv/Scripts/python -m PyInstaller --noconfirm desktop.spec
+./scripts/build-installer.ps1; ./scripts/validate-installer.ps1
 ```
 
 Update `README.md`, `docs/FORMAT.md`, and tests with behavioral changes.
 
+Application startup must call Alembic through `app.database.run_migrations`; do not restore `Base.metadata.create_all()` as the upgrade path. Backup and restore behavior belongs in `app.backups`, and request payloads belong in strict models in `app.schemas`. Browser and packaged smoke tests must set `QUIZVAULT_DATA_DIR` to a unique temporary directory.

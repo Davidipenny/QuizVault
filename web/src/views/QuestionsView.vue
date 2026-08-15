@@ -6,13 +6,13 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import QuestionEditor from '../components/QuestionEditor.vue'
 import { api, jsonBody } from '../api'
 import { useAppStore } from '../stores/app'
-import type { Question } from '../types'
+import type { EditableQuestion } from '../types'
 
 const route = useRoute(), router = useRouter(), store = useAppStore()
 const bankId = computed(() => String(route.params.bankId))
 const bank = computed(() => store.banks.find(b => b.id === bankId.value))
-const loading = ref(false), items = ref<Question[]>([]), total = ref(0), selected = ref<Question[]>([])
-const drawer = ref(false), editing = ref<Question | null>(null), batchDialog = ref(false)
+const loading = ref(false), items = ref<EditableQuestion[]>([]), total = ref(0), selected = ref<EditableQuestion[]>([])
+const drawer = ref(false), editing = ref<EditableQuestion | null>(null), batchDialog = ref(false)
 const query = reactive({ search: '', type: '', page: 1, page_size: 30 })
 const batch = reactive({ action: 'copy', target_bank_id: '' })
 const typeLabels: Record<string,string> = { single:'单选', multi:'多选', any:'任意选', truefalse:'判断', fill:'填空', essay:'问答' }
@@ -28,15 +28,15 @@ async function load() {
     const data = await api<any>(`/banks/${bankId.value}/questions?${params}`); items.value=data.items; total.value=data.total
   } finally { loading.value=false }
 }
-function open(question?: Question) { editing.value = question || null; drawer.value=true }
-async function save(value: Question) {
+function open(question?: EditableQuestion) { editing.value = question || null; drawer.value=true }
+async function save(value: EditableQuestion) {
   try {
     if (editing.value?.id) await api(`/questions/${editing.value.id}`, { method:'PUT', ...jsonBody(value) })
     else await api(`/banks/${bankId.value}/questions`, { method:'POST', ...jsonBody(value) })
     drawer.value=false; await load(); await store.loadBanks(); ElMessage.success('题目已保存')
   } catch (error:any) { ElMessage.error(error.message) }
 }
-async function remove(question: Question) {
+async function remove(question: EditableQuestion) {
   await ElMessageBox.confirm('确认删除这道题？', '删除题目', { type:'warning' }); await api(`/questions/${question.id}`, { method:'DELETE' }); await load()
 }
 async function runBatch() {
@@ -81,4 +81,3 @@ async function runBatch() {
 </template>
 
 <style scoped>.page-header h1 { margin-top:8px }.pager { display:flex; justify-content:flex-end; padding:16px 18px; border-top:1px solid var(--qv-border); }</style>
-

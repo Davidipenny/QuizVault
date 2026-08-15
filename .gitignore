@@ -24,6 +24,7 @@ build/
 # 打包生成的可执行文件（quiz.exe、quiz_gui.exe）
 dist/
 *.exe
+installer/vendor/
 # 打包 zip（上传到 GitHub Releases，不提交到仓库）
 *.zip
 
@@ -53,6 +54,8 @@ test/
 .dev-data/
 web/node_modules/
 web/dist/
+web/test-results/
+web/playwright-report/
 server/.pytest_cache/
 server/**/__pycache__/
 *.db

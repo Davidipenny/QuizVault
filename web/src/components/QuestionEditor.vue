@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 import { Delete, Plus } from '@element-plus/icons-vue'
-import type { Question, QuestionType } from '../types'
+import type { EditableQuestion, QuestionType } from '../types'
 
-const props = defineProps<{ modelValue?: Question | null }>()
-const emit = defineEmits<{ save: [value: Question]; cancel: [] }>()
+const props = defineProps<{ modelValue?: EditableQuestion | null }>()
+const emit = defineEmits<{ save: [value: EditableQuestion]; cancel: [] }>()
 const types = [
   { value: 'single', label: '单选题' }, { value: 'multi', label: '多选题' },
   { value: 'any', label: '任意选' }, { value: 'truefalse', label: '判断题' },
   { value: 'fill', label: '填空题' }, { value: 'essay', label: '问答题' },
 ]
-const blank = (): Question => ({ type: 'single', prompt: '', case_material: '', explanation: '', source: '', choices: [
+const blank = (): EditableQuestion => ({ type: 'single', prompt: '', case_material: '', explanation: '', source: '', choices: [
   { label: 'A', content: '', is_correct: true }, { label: 'B', content: '', is_correct: false },
 ], answer_spec: { correct: ['A'] } })
-const form = reactive<Question>(blank())
+const form = reactive<EditableQuestion>(blank())
 const fillText = reactive({ value: '' })
 
 watch(() => props.modelValue, (value) => {
@@ -97,4 +97,3 @@ function submit() {
 .form-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 16px; border-top: 1px solid var(--qv-border); }
 .editor-form :deep(.el-segmented) { max-width: 100%; overflow-x: auto; }
 </style>
-

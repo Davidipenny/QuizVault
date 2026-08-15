@@ -12,6 +12,10 @@ export interface Question {
   answer_meta?: { blank_count?: number; unordered?: boolean }
 }
 
+export interface EditableQuestion extends Question {
+  answer_spec: Record<string, any>
+}
+
 export interface StudyState {
   id: string; question_id: string; wrong_count: number; favorite: boolean; note: string
   flagged: boolean; mastery: string; last_answered_at?: string; question: Question

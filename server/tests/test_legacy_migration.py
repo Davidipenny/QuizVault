@@ -75,3 +75,18 @@ def test_legacy_preview_and_commit_preserve_all_supported_state_formats():
         assert max(state.wrong_count for state in states) == 7
         assert any(state.flagged for state in states)
         assert len(db.scalars(select(Collection).where(Collection.name.in_(["旧列表", "新结构"]))).all()) == 2
+
+
+def test_fixed_legacy_fixture_covers_real_file_variants():
+    fixture = Path(__file__).parent / "fixtures" / "legacy_complete"
+
+    with TestClient(app) as client:
+        preview = client.get("/api/v1/migration/legacy/preview", params={"path": str(fixture)})
+
+    assert preview.status_code == 200
+    report = preview.json()
+    assert {bank["name"] for bank in report["banks"]} == {"示例旧题库", "旧式状态题库"}
+    sample = next(bank for bank in report["banks"] if bank["name"] == "示例旧题库")
+    assert sample["deleted"] == 1
+    assert any(issue["file"] == "broken.json" for issue in sample["issues"])
+    assert report["summary"]["migratable"] >= 4
