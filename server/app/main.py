@@ -3,9 +3,7 @@ from __future__ import annotations
 import json
 import os
 import random
-import shutil
 import base64
-import sqlite3
 import tempfile
 import io
 from contextlib import asynccontextmanager
@@ -21,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from .config import API_PREFIX, APP_NAME, data_dir, database_path, frontend_dist_dir, legacy_banks_dir
+from .backups import MAX_BACKUP_SIZE, backup_info, create_backup as create_database_backup, restore_database, validate_database
 from .database import Base, engine, get_db
 from .domain import grade_answer, question_fingerprint, validate_question
 from .importers import load_legacy_bank, parse_source
@@ -791,22 +790,18 @@ def answer_history(bank_id: str = "", page: int = 1, page_size: int = 50, db: Se
 
 
 def create_backup() -> Path:
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-    destination = data_dir() / "backups" / f"quizvault-{stamp}.db"
-    if database_path().exists():
-        shutil.copy2(database_path(), destination)
-    return destination
+    return create_database_backup(database_path(), data_dir() / "backups")
 
 
 @app.post(f"{API_PREFIX}/backups")
 def backup():
     path = create_backup()
-    return {"filename": path.name, "size": path.stat().st_size if path.exists() else 0}
+    return backup_info(path)
 
 
 @app.get(f"{API_PREFIX}/backups")
 def list_backups():
-    return [{"filename": p.name, "size": p.stat().st_size, "created_at": datetime.fromtimestamp(p.stat().st_mtime, timezone.utc)} for p in sorted((data_dir() / "backups").glob("*.db"), reverse=True)]
+    return [backup_info(path) for path in sorted((data_dir() / "backups").glob("*.db"), reverse=True)]
 
 
 @app.get(f"{API_PREFIX}/backups/{{filename}}")
@@ -814,6 +809,9 @@ def download_backup(filename: str):
     safe = Path(filename).name
     path = data_dir() / "backups" / safe
     if not path.exists(): raise HTTPException(404, "备份不存在")
+    validation = validate_database(path)
+    if not validation.valid:
+        raise HTTPException(422, validation.error or "备份无效")
     return FileResponse(path, filename=safe, media_type="application/x-sqlite3")
 
 
@@ -826,20 +824,16 @@ def restore_backup(payload: dict):
         raw = base64.b64decode(encoded, validate=True)
     except Exception:
         raise HTTPException(422, "备份编码无效")
-    if len(raw) > 512 * 1024 * 1024:
+    if len(raw) > MAX_BACKUP_SIZE:
         raise HTTPException(413, "备份文件过大")
-    temp_path = data_dir() / "restore-upload.db"
-    temp_path.write_bytes(raw)
-    required = {"question_banks", "questions", "quiz_sessions"}
+    descriptor, temp_name = tempfile.mkstemp(prefix="restore-upload-", suffix=".db", dir=data_dir())
+    os.close(descriptor)
+    temp_path = Path(temp_name)
     try:
-        with sqlite3.connect(temp_path) as source:
-            tables = {row[0] for row in source.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            if not required.issubset(tables):
-                raise HTTPException(422, "不是有效的 QuizVault 备份")
-            create_backup()
-            engine.dispose()
-            with sqlite3.connect(database_path()) as destination:
-                source.backup(destination)
+        temp_path.write_bytes(raw)
+        restore_database(temp_path, database_path(), data_dir() / "backups", engine.dispose)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
     finally:
         temp_path.unlink(missing_ok=True)
     return {"restored": True}
