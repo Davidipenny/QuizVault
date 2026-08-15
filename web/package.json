@@ -1,0 +1,27 @@
+{
+  "name": "quizvault-web",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vue-tsc --noEmit -p tsconfig.app.json && vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "element-plus": "^2.11.2",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.21",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^26.1.0",
+    "typescript": "~5.9.2",
+    "vite": "^7.1.4",
+    "vitest": "^3.2.4",
+    "vue-tsc": "^3.0.6"
+  }
+}
