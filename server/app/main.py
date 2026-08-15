@@ -22,7 +22,7 @@ from .config import API_PREFIX, APP_NAME, data_dir, database_path, frontend_dist
 from .backups import MAX_BACKUP_SIZE, backup_info, create_backup as create_database_backup, restore_database, validate_database
 from .database import Base, engine, get_db
 from .domain import grade_answer, question_fingerprint, validate_question
-from .importers import load_legacy_bank, parse_source
+from .importers import normalize_type, parse_source, scan_legacy_bank
 from .models import (
     Choice, Collection, CollectionQuestion, ImportJob, LegacyMapping, Question,
     QuestionBank, QuizAnswer, QuizSession, StudyState, User, Workspace, now,
@@ -388,14 +388,114 @@ def legacy_preview(path: str = "", db: Session = Depends(get_db)):
     if not root.exists() or not root.is_dir():
         raise HTTPException(404, "旧版 banks 目录不存在")
     banks = []
+    summary = {"migratable": 0, "invalid": 0, "duplicate": 0, "already_migrated": 0, "unmatched": 0}
     for folder in sorted(p for p in root.iterdir() if p.is_dir()):
         try:
-            questions = load_legacy_bank(folder)
-            errors = sum(bool(validate_question(q)) for q in questions)
-            banks.append({"name": folder.name, "path": str(folder), "questions": len(questions), "errors": errors})
+            scan = scan_legacy_bank(folder)
+            candidates = _legacy_candidates(scan["questions"])
+            stats = {"migratable": 0, "invalid": 0, "duplicate": scan["duplicates"], "already_migrated": 0, "unmatched": 0}
+            user = local_user(db)
+            bank = db.scalar(select(QuestionBank).where(and_(QuestionBank.workspace_id == user.workspace_id, QuestionBank.name == folder.name)))
+            existing_fingerprints = set(db.scalars(select(Question.fingerprint).where(Question.bank_id == bank.id)).all()) if bank else set()
+            for item in scan["questions"]:
+                if validate_question(item):
+                    stats["invalid"] += 1
+                elif db.get(LegacyMapping, _legacy_key(folder, item)):
+                    stats["already_migrated"] += 1
+                elif question_fingerprint(item) in existing_fingerprints:
+                    stats["duplicate"] += 1
+                else:
+                    stats["migratable"] += 1
+            state_report = _analyze_legacy_states(folder, candidates)
+            stats["unmatched"] = state_report["unmatched"]
+            issues = [*scan["issues"], *state_report["issues"]]
+            for key in summary:
+                summary[key] += stats[key]
+            banks.append({
+                "name": folder.name, "path": str(folder), "questions": len(scan["questions"]),
+                "errors": stats["invalid"] + len(issues), "stats": stats, "issues": issues,
+                "deleted": scan["deleted"],
+            })
         except Exception as exc:
             banks.append({"name": folder.name, "path": str(folder), "questions": 0, "errors": 1, "message": str(exc)})
-    return {"root": str(root), "banks": banks, "total_questions": sum(x["questions"] for x in banks), "read_only": True}
+    return {"root": str(root), "banks": banks, "total_questions": sum(x["questions"] for x in banks), "summary": summary, "read_only": True}
+
+
+def _legacy_key(folder: Path, item: dict) -> str:
+    directory = os.path.normcase(str(folder.resolve()))
+    source = str(item.get("_legacy_source") or item.get("source") or "")
+    return f"{directory}|{source}|{item.get('_legacy_id')}|{item['type']}"
+
+
+def _legacy_candidates(items: list[dict]) -> dict[tuple, list[dict]]:
+    candidates: dict[tuple, list[dict]] = {}
+    for item in items:
+        candidates.setdefault((item.get("_legacy_id"), normalize_type(item.get("type"))), []).append(item)
+    return candidates
+
+
+def _resolve_legacy_entry(entry: dict, candidates: dict[tuple, list[dict]]) -> dict | None:
+    matches = candidates.get((entry.get("id"), normalize_type(entry.get("type"))), [])
+    if len(matches) == 1:
+        return matches[0]
+    prompt = str(entry.get("question") or entry.get("prompt") or "").strip()
+    if prompt:
+        normalized = " ".join(prompt.split())
+        narrowed = [item for item in matches if " ".join(str(item.get("prompt", "")).split()) == normalized]
+        if len(narrowed) == 1:
+            return narrowed[0]
+    return None
+
+
+def _read_legacy_json(folder: Path, filename: str, issues: list[dict]):
+    path = folder / filename
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        issues.append({"file": filename, "message": f"状态文件无效：{exc}"})
+        return None
+
+
+def _wrong_entries(data) -> list[dict]:
+    if isinstance(data, list):
+        return [entry for entry in data if isinstance(entry, dict)]
+    if not isinstance(data, dict):
+        return []
+    if isinstance(data.get("wrong_books"), dict):
+        return [entry for book in data["wrong_books"].values() if isinstance(book, list) for entry in book if isinstance(entry, dict)]
+    for key in ("wrong_questions", "questions"):
+        if isinstance(data.get(key), list):
+            return [entry for entry in data[key] if isinstance(entry, dict)]
+    return []
+
+
+def _analyze_legacy_states(folder: Path, candidates: dict[tuple, list[dict]]) -> dict:
+    issues: list[dict] = []
+    unmatched = matched = 0
+    sources: list[tuple[str, list[dict]]] = []
+    wrong_data = _read_legacy_json(folder, "wrong_questions.json", issues)
+    sources.append(("wrong_questions.json", _wrong_entries(wrong_data)))
+    flagged = _read_legacy_json(folder, "flagged.json", issues)
+    flagged_entries = flagged.get("flagged", flagged) if isinstance(flagged, dict) else flagged
+    sources.append(("flagged.json", flagged_entries if isinstance(flagged_entries, list) else []))
+    collections = _read_legacy_json(folder, "collections.json", issues)
+    groups = collections.get("collections", {}) if isinstance(collections, dict) else {}
+    for name, value in groups.items():
+        entries = value.get("questions", []) if isinstance(value, dict) else value
+        sources.append((f"collections.json:{name}", entries if isinstance(entries, list) else []))
+    progress = _read_legacy_json(folder, "quiz_progress.json", issues)
+    if isinstance(progress, dict):
+        sources.append(("quiz_progress.json:wrong_questions", progress.get("wrong_questions", [])))
+    for source, entries in sources:
+        for entry in entries:
+            if not isinstance(entry, dict) or not _resolve_legacy_entry(entry, candidates):
+                unmatched += 1
+                issues.append({"file": source, "message": "无法匹配题目", "entry": entry})
+            else:
+                matched += 1
+    return {"matched": matched, "unmatched": unmatched, "issues": issues}
 
 
 @app.post(f"{API_PREFIX}/migration/legacy/commit")
@@ -405,7 +505,7 @@ def legacy_commit(payload: dict, db: Session = Depends(get_db)):
         raise HTTPException(404, "旧版目录不存在")
     create_backup()
     user = local_user(db)
-    result = {"banks": 0, "questions": 0, "collections": 0, "sessions": 0, "skipped": 0, "invalid_questions": 0, "unmatched_states": 0}
+    result = {"banks": 0, "questions": 0, "collections": 0, "sessions": 0, "skipped": 0, "invalid_questions": 0, "unmatched_states": 0, "issues": []}
     try:
         for folder in sorted(p for p in root.iterdir() if p.is_dir()):
             bank = db.scalar(select(QuestionBank).where(and_(QuestionBank.workspace_id == user.workspace_id, QuestionBank.name == folder.name)))
@@ -414,19 +514,21 @@ def legacy_commit(payload: dict, db: Session = Depends(get_db)):
                 db.add(bank)
                 db.flush()
                 result["banks"] += 1
-            id_map: dict[tuple, str] = {}
-            ordered_question_ids: list[str] = []
-            legacy_items = load_legacy_bank(folder)
+            scan = scan_legacy_bank(folder)
+            result["issues"].extend({"bank": folder.name, **issue} for issue in scan["issues"])
+            legacy_items = scan["questions"]
+            source_order: list[str | None] = []
             for index, item in enumerate(legacy_items):
                 if validate_question(item):
                     result["invalid_questions"] += 1
+                    source_order.append(None)
                     continue
-                legacy_key = f"{folder.resolve()}|{item.get('source')}|{index}|{item['type']}"
+                legacy_key = _legacy_key(folder, item)
                 mapping = db.get(LegacyMapping, legacy_key)
                 if mapping:
                     result["skipped"] += 1
-                    id_map[(item.get("_legacy_id"), item["type"])] = mapping.question_id
-                    ordered_question_ids.append(mapping.question_id)
+                    item["_target_id"] = mapping.question_id
+                    source_order.append(mapping.question_id)
                     continue
                 existing = db.scalar(select(Question).where(and_(Question.bank_id == bank.id, Question.fingerprint == question_fingerprint(item))))
                 if existing:
@@ -436,9 +538,9 @@ def legacy_commit(payload: dict, db: Session = Depends(get_db)):
                     question = create_question(db, bank.id, item, index)
                     result["questions"] += 1
                 db.add(LegacyMapping(legacy_key=legacy_key, question_id=question.id))
-                id_map[(item.get("_legacy_id"), item["type"])] = question.id
-                ordered_question_ids.append(question.id)
-            migrate_legacy_states(db, user.id, bank.id, folder, id_map, ordered_question_ids, result)
+                item["_target_id"] = question.id
+                source_order.append(question.id)
+            migrate_legacy_states(db, user.id, bank.id, folder, _legacy_candidates(legacy_items), source_order, result)
         db.commit()
     except Exception as exc:
         db.rollback()
@@ -446,74 +548,80 @@ def legacy_commit(payload: dict, db: Session = Depends(get_db)):
     return result
 
 
-def migrate_legacy_states(db: Session, user_id: str, bank_id: str, folder: Path, id_map: dict, ordered_question_ids: list[str], result: dict):
-    state_files = {
-        "wrong_questions.json": "wrong", "flagged.json": "flagged", "collections.json": "collection",
+def migrate_legacy_states(db: Session, user_id: str, bank_id: str, folder: Path, candidates: dict, source_order: list[str | None], result: dict):
+    issues: list[dict] = []
+    state_cache = {
+        state.question_id: state
+        for state in db.scalars(select(StudyState).where(StudyState.user_id == user_id)).all()
     }
-    for filename, kind in state_files.items():
-        file = folder / filename
-        if not file.exists():
-            continue
-        try:
-            data = json.loads(file.read_text(encoding="utf-8"))
-        except Exception:
-            result["unmatched_states"] += 1
-            continue
-        if kind == "wrong":
-            entries = data.get("questions", data) if isinstance(data, dict) else data
-            for entry in entries if isinstance(entries, list) else []:
-                question_id = id_map.get((entry.get("id"), entry.get("type")))
-                if not question_id:
-                    result["unmatched_states"] += 1
-                    continue
-                state = db.scalar(select(StudyState).where(and_(StudyState.user_id == user_id, StudyState.question_id == question_id))) or StudyState(user_id=user_id, question_id=question_id, wrong_count=0, favorite=False, note="", flagged=False, mastery="new")
-                state.wrong_count = max(state.wrong_count or 0, int(entry.get("wrong_count", 1)))
-                db.add(state)
-        elif kind == "flagged":
-            entries = data.get("flagged", data) if isinstance(data, dict) else data
-            for entry in entries if isinstance(entries, list) else []:
-                question_id = id_map.get((entry.get("id"), entry.get("type")))
-                if question_id:
-                    state = db.scalar(select(StudyState).where(and_(StudyState.user_id == user_id, StudyState.question_id == question_id))) or StudyState(user_id=user_id, question_id=question_id, wrong_count=0, favorite=False, note="", flagged=False, mastery="new")
-                    state.flagged = True
-                    db.add(state)
-        elif kind == "collection":
-            groups = data.get("collections", {}) if isinstance(data, dict) else {}
-            for name, value in groups.items():
-                entries = value.get("questions", []) if isinstance(value, dict) else value
-                collection = db.scalar(select(Collection).where(and_(Collection.user_id == user_id, Collection.name == name)))
-                if not collection:
-                    collection = Collection(user_id=user_id, name=name)
-                    db.add(collection)
-                    db.flush()
-                    result["collections"] += 1
-                for entry in entries if isinstance(entries, list) else []:
-                    question_id = id_map.get((entry.get("id"), entry.get("type")))
-                    if not question_id:
-                        result["unmatched_states"] += 1
-                        continue
-                    if not db.get(CollectionQuestion, (collection.id, question_id)):
-                        db.add(CollectionQuestion(collection_id=collection.id, question_id=question_id))
-                    state = db.scalar(select(StudyState).where(and_(StudyState.user_id == user_id, StudyState.question_id == question_id))) or StudyState(user_id=user_id, question_id=question_id, wrong_count=0, favorite=False, note="", flagged=False, mastery="new")
-                    state.favorite = True
-                    db.add(state)
 
+    def resolve(entry):
+        item = _resolve_legacy_entry(entry, candidates) if isinstance(entry, dict) else None
+        if not item or not item.get("_target_id"):
+            result["unmatched_states"] += 1
+            result["issues"].append({"bank": folder.name, "message": "无法匹配状态题目", "entry": entry})
+            return None
+        return item["_target_id"]
+
+    def state_for(question_id):
+        state = state_cache.get(question_id)
+        if not state:
+            state = StudyState(user_id=user_id, question_id=question_id, wrong_count=0, favorite=False, note="", flagged=False, mastery="new")
+            state_cache[question_id] = state
+            db.add(state)
+        return state
+
+    wrong_data = _read_legacy_json(folder, "wrong_questions.json", issues)
+    for entry in _wrong_entries(wrong_data):
+        question_id = resolve(entry)
+        if question_id:
+            state = state_for(question_id)
+            state.wrong_count = max(state.wrong_count or 0, max(0, int(entry.get("wrong_count", 1))))
+            state.mastery = "learning" if state.wrong_count else state.mastery
+
+    flagged_data = _read_legacy_json(folder, "flagged.json", issues)
+    flagged_entries = flagged_data.get("flagged", flagged_data) if isinstance(flagged_data, dict) else flagged_data
+    for entry in flagged_entries if isinstance(flagged_entries, list) else []:
+        question_id = resolve(entry)
+        if question_id:
+            state_for(question_id).flagged = True
+
+    collection_data = _read_legacy_json(folder, "collections.json", issues)
+    groups = collection_data.get("collections", {}) if isinstance(collection_data, dict) else {}
+    for name, value in groups.items():
+        entries = value.get("questions", []) if isinstance(value, dict) else value
+        collection = db.scalar(select(Collection).where(and_(Collection.user_id == user_id, Collection.name == str(name))))
+        if not collection:
+            collection = Collection(user_id=user_id, name=str(name))
+            db.add(collection)
+            db.flush()
+            result["collections"] += 1
+        for entry in entries if isinstance(entries, list) else []:
+            question_id = resolve(entry)
+            if not question_id:
+                continue
+            if not db.get(CollectionQuestion, (collection.id, question_id)):
+                db.add(CollectionQuestion(collection_id=collection.id, question_id=question_id))
+            state_for(question_id).favorite = True
+
+    result["issues"].extend({"bank": folder.name, **issue} for issue in issues)
     progress_file = folder / "quiz_progress.json"
-    if not progress_file.exists() or not ordered_question_ids:
+    if not progress_file.exists() or not any(source_order):
         return
     try:
         progress = json.loads(progress_file.read_text(encoding="utf-8"))
-        source_key = str(progress_file.resolve())
-        existing = db.scalars(select(QuizSession).where(and_(QuizSession.user_id == user_id, QuizSession.bank_id == bank_id, QuizSession.status == "active"))).all()
+        source_key = os.path.normcase(str(progress_file.resolve()))
+        existing = db.scalars(select(QuizSession).where(and_(QuizSession.user_id == user_id, QuizSession.bank_id == bank_id))).all()
         if any(session.config.get("legacy_progress_source") == source_key for session in existing):
             return
         order = progress.get("question_order")
         if isinstance(order, list):
-            question_order = [ordered_question_ids[index] for index in order if isinstance(index, int) and 0 <= index < len(ordered_question_ids)]
+            raw_order = [source_order[index] if isinstance(index, int) and 0 <= index < len(source_order) else None for index in order]
         else:
-            question_order = list(ordered_question_ids)
-        expected_total = int(progress.get("total_questions", len(question_order)))
-        question_order = question_order[:expected_total]
+            raw_order = list(source_order)
+        expected_total = int(progress.get("total_questions", len(raw_order)))
+        raw_order = raw_order[:expected_total]
+        question_order = [question_id for question_id in raw_order if question_id]
         if not question_order:
             return
         config = {
@@ -525,23 +633,27 @@ def migrate_legacy_states(db: Session, user_id: str, bank_id: str, folder: Path,
         }
         session = QuizSession(
             user_id=user_id, bank_id=bank_id, config=config, question_order=question_order,
-            current_index=min(int(progress.get("current_idx", 0)), len(question_order) - 1), status="active",
+            current_index=min(sum(bool(question_id) for question_id in raw_order[:max(0, int(progress.get("current_idx", 0)))]), len(question_order) - 1), status="active",
         )
         db.add(session)
         db.flush()
         result["sessions"] += 1
         for index, answer in enumerate(progress.get("answers", [])):
-            if index >= len(question_order) or not isinstance(answer, dict):
+            if index >= len(raw_order) or not isinstance(answer, dict):
                 break
-            question = get_question(db, question_order[index])
+            question_id = raw_order[index]
+            if not question_id:
+                continue
+            question = get_question(db, question_id)
             user_answer = str(answer.get("user_answer", "")).upper()
             db.add(QuizAnswer(
                 session_id=session.id, question_id=question.id,
                 answer={"selected": list(user_answer)}, question_snapshot=question_dict(question),
                 is_correct=answer.get("is_correct"),
             ))
-    except Exception:
+    except Exception as exc:
         result["unmatched_states"] += 1
+        result["issues"].append({"bank": folder.name, "file": "quiz_progress.json", "message": str(exc)})
 
 
 @app.post(f"{API_PREFIX}/quiz-sessions", status_code=201)

@@ -147,28 +147,92 @@ def parse_source(source_type: str, content: str, filename: str = "") -> list[dic
 
 
 def load_legacy_bank(bank_dir: Path) -> list[dict]:
+    return scan_legacy_bank(bank_dir)["questions"]
+
+
+def _legacy_parser():
     parser_path = Path(__file__).resolve().parents[2] / "parse_markdown.py"
     spec = importlib.util.spec_from_file_location("quizvault_legacy_parser", parser_path)
     if not spec or not spec.loader:
         raise RuntimeError("无法加载旧版 Markdown 解析器")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    parse_markdown = module.parse_markdown
+    return module.parse_markdown
+
+
+def _convert_legacy_item(item: dict, filename: str) -> dict:
+    converted = row_to_question({
+        "type": item.get("type", "single"),
+        "question": item.get("question") or item.get("prompt", ""),
+        "choices": item.get("options") or item.get("choices", {}),
+        "answer_spec": item.get("answer_spec"),
+        "answer": item.get("answer", ""),
+        "explanation": item.get("explanation", ""),
+        "case_material": item.get("case_material", ""),
+    }, str(item.get("source") or filename))
+    converted["_legacy_id"] = item.get("id")
+    converted["_legacy_source"] = filename
+    return converted
+
+
+def scan_legacy_bank(bank_dir: Path) -> dict:
+    parse_markdown = _legacy_parser()
+    runtime_files = {
+        "wrong_questions.json", "collections.json", "flagged.json",
+        "deleted.json", "quiz_progress.json",
+    }
+    deleted: set[tuple[Any, str]] = set()
+    issues: list[dict] = []
+    deleted_file = bank_dir / "deleted.json"
+    if deleted_file.exists():
+        try:
+            data = json.loads(deleted_file.read_text(encoding="utf-8"))
+            for entry in data.get("deleted", []) if isinstance(data, dict) else []:
+                deleted.add((entry.get("id"), normalize_type(entry.get("type"))))
+        except (OSError, json.JSONDecodeError) as exc:
+            issues.append({"file": deleted_file.name, "message": f"删除记录无效：{exc}"})
 
     result: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    duplicate_count = 0
+    deleted_count = 0
     for file in sorted(bank_dir.iterdir()):
-        if file.suffix.lower() == ".md":
-            for item in parse_markdown(file.read_text(encoding="utf-8")):
-                answer = str(item.get("answer", "")).upper()
-                qtype = item.get("type", "single")
-                choices = item.get("options", {})
-                converted = row_to_question({
-                    "type": qtype,
-                    "question": item.get("question", ""),
-                    "choices": choices,
-                    "answer": answer,
-                    "explanation": item.get("explanation", ""),
-                }, file.name)
-                converted["_legacy_id"] = item.get("id")
-                result.append(converted)
-    return result
+        if not file.is_file() or file.name.lower() in runtime_files:
+            continue
+        try:
+            if file.suffix.lower() == ".md":
+                items = parse_markdown(file.read_text(encoding="utf-8"))
+            elif file.suffix.lower() == ".json":
+                payload = json.loads(file.read_text(encoding="utf-8"))
+                if isinstance(payload, dict):
+                    items = payload.get("questions", [])
+                elif isinstance(payload, list):
+                    items = payload
+                else:
+                    items = []
+            else:
+                continue
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            issues.append({"file": file.name, "message": f"题库文件无效：{exc}"})
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                issues.append({"file": file.name, "message": "题目不是对象"})
+                continue
+            qtype = normalize_type(item.get("type", "single"))
+            if (item.get("id"), qtype) in deleted:
+                deleted_count += 1
+                continue
+            converted = _convert_legacy_item(item, file.name)
+            key = (qtype, compact_text(converted["prompt"]))
+            if key in seen:
+                duplicate_count += 1
+                continue
+            seen.add(key)
+            result.append(converted)
+    return {
+        "questions": result,
+        "issues": issues,
+        "duplicates": duplicate_count,
+        "deleted": deleted_count,
+    }
