@@ -43,6 +43,8 @@ describe('ImportView', () => {
   it('submits corrected and excluded preview rows for server-side recalculation', async () => {
     const wrapper = mount(ImportView, { global: { plugins: [ElementPlus] } })
     await flushPromises()
+    expect(wrapper.text()).not.toContain('旧版迁移')
+    expect(wrapper.text()).not.toContain('扫描旧数据')
     await wrapper.find('textarea').setValue('待解析内容')
     await wrapper.findAll('button').find(button => button.text().includes('解析并预览'))!.trigger('click')
     await flushPromises()

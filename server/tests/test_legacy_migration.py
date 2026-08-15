@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.database import SessionLocal
-from app.main import app
-from app.models import Collection, QuestionBank, QuizAnswer, QuizSession, StudyState
+from app.main import app, auto_import_legacy_banks
+from app.models import Collection, LegacyMapping, Question, QuestionBank, QuizAnswer, QuizSession, StudyState
 
 
 def write_json(path: Path, value) -> None:
@@ -90,3 +90,25 @@ def test_fixed_legacy_fixture_covers_real_file_variants():
     assert sample["deleted"] == 1
     assert any(issue["file"] == "broken.json" for issue in sample["issues"])
     assert report["summary"]["migratable"] >= 4
+
+
+def test_startup_bank_import_is_automatic_and_idempotent(tmp_path, monkeypatch):
+    root = tmp_path / "banks"
+    folder = root / "自动识别题库"
+    folder.mkdir(parents=True)
+    folder.joinpath("questions.md").write_text(
+        "## 单选题\n\n**1. 自动导入题（　）**\nA. 甲\nB. 乙\n\n**答案：A**",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("QUIZVAULT_LEGACY_BANKS", str(root))
+
+    first = auto_import_legacy_banks()
+    repeated = auto_import_legacy_banks()
+
+    assert first and first["banks"] == 1 and first["questions"] == 1
+    assert repeated and repeated["banks"] == 0 and repeated["questions"] == 0
+    with SessionLocal() as db:
+        bank = db.scalar(select(QuestionBank).where(QuestionBank.name == folder.name))
+        assert bank.description == "由本地 banks 自动导入"
+        assert len(db.scalars(select(Question).where(Question.bank_id == bank.id)).all()) == 1
+        assert len(db.scalars(select(LegacyMapping).where(LegacyMapping.question_id.in_(select(Question.id).where(Question.bank_id == bank.id)))).all()) == 1

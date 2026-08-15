@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import base64
 import io
-import importlib.util
 import json
 import re
 from pathlib import Path
 from typing import Any
 
 from .domain import compact_text
+from .legacy_markdown import parse_markdown as parse_legacy_markdown
 
 
 TYPE_ALIASES = {
@@ -150,16 +150,6 @@ def load_legacy_bank(bank_dir: Path) -> list[dict]:
     return scan_legacy_bank(bank_dir)["questions"]
 
 
-def _legacy_parser():
-    parser_path = Path(__file__).resolve().parents[2] / "parse_markdown.py"
-    spec = importlib.util.spec_from_file_location("quizvault_legacy_parser", parser_path)
-    if not spec or not spec.loader:
-        raise RuntimeError("无法加载旧版 Markdown 解析器")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.parse_markdown
-
-
 def _convert_legacy_item(item: dict, filename: str) -> dict:
     converted = row_to_question({
         "type": item.get("type", "single"),
@@ -176,7 +166,6 @@ def _convert_legacy_item(item: dict, filename: str) -> dict:
 
 
 def scan_legacy_bank(bank_dir: Path) -> dict:
-    parse_markdown = _legacy_parser()
     runtime_files = {
         "wrong_questions.json", "collections.json", "flagged.json",
         "deleted.json", "quiz_progress.json",
@@ -201,7 +190,7 @@ def scan_legacy_bank(bank_dir: Path) -> dict:
             continue
         try:
             if file.suffix.lower() == ".md":
-                items = parse_markdown(file.read_text(encoding="utf-8"))
+                items = parse_legacy_markdown(file.read_text(encoding="utf-8"))
             elif file.suffix.lower() == ".json":
                 payload = json.loads(file.read_text(encoding="utf-8"))
                 if isinstance(payload, dict):

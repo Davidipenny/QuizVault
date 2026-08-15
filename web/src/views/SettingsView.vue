@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { Download, Refresh, UploadFilled } from '@element-plus/icons-vue'
+import { Download, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api, authorizedDownloadUrl, fileAsBase64, jsonBody } from '../api'
 import { useAppStore } from '../stores/app'
 
-const store=useAppStore(),router=useRouter(),backups=ref<any[]>([]),creating=ref(false)
+const store=useAppStore(),backups=ref<any[]>([]),creating=ref(false)
 onMounted(load)
 async function load(){backups.value=await api('/backups')}
 async function backup(){creating.value=true;try{await api('/backups',{method:'POST'});await load();ElMessage.success('备份已创建')}finally{creating.value=false}}
@@ -19,7 +18,7 @@ async function restore(upload:any){try{const content=await fileAsBase64(upload.r
     <header class="page-header"><div><h1>数据与设置</h1><p>外观、备份和本地数据维护</p></div></header>
     <div class="settings-grid">
       <div class="panel panel-body"><h2>外观</h2><div class="setting-row"><div><strong>夜间模式</strong><span>降低暗光环境下的屏幕亮度</span></div><el-switch :model-value="store.dark" @change="store.setDark(Boolean($event))" /></div><div class="setting-row"><div><strong>答题字体</strong><span>{{store.fontSize}} px</span></div><el-slider :model-value="store.fontSize" :min="14" :max="22" :step="1" style="width:180px" @input="store.setFontSize(Number($event))" /></div></div>
-      <div class="panel panel-body"><h2>数据迁移与恢复</h2><p class="muted">从旧版 banks 目录迁移，或恢复此前导出的 SQLite 备份。</p><div class="toolbar"><el-button :icon="UploadFilled" @click="router.push('/import')">迁移向导</el-button><el-upload :auto-upload="false" :show-file-list="false" accept=".db" :on-change="restore"><el-button>恢复备份</el-button></el-upload></div></div>
+      <div class="panel panel-body"><h2>数据恢复</h2><p class="muted">从此前导出的 SQLite 文件恢复本地数据。</p><el-upload :auto-upload="false" :show-file-list="false" accept=".db" :on-change="restore"><el-button>选择备份文件</el-button></el-upload></div>
     </div>
     <div class="panel backup-panel">
       <div class="panel-header"><div><strong>本地备份</strong><p class="muted">备份文件保存在 QuizVault 应用数据目录</p></div><div class="toolbar"><el-tooltip content="刷新"><el-button :icon="Refresh" circle @click="load" /></el-tooltip><el-button type="primary" :loading="creating" @click="backup">立即备份</el-button></div></div>

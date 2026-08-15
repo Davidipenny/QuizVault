@@ -39,6 +39,8 @@ from .schemas import (
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     initialize_database()
+    if os.getenv("QUIZVAULT_AUTO_IMPORT_BANKS") == "1":
+        auto_import_legacy_banks()
     yield
 
 
@@ -459,8 +461,19 @@ def legacy_preview(path: str = "", db: Session = Depends(get_db)):
     return {"root": str(root), "banks": banks, "total_questions": sum(x["questions"] for x in banks), "summary": summary, "read_only": True}
 
 
+def _legacy_directory_key(folder: Path) -> str:
+    source_id = os.getenv("QUIZVAULT_LEGACY_SOURCE_ID")
+    if source_id:
+        try:
+            relative = folder.resolve().relative_to(legacy_banks_dir().resolve())
+            return f"{source_id}/{relative.as_posix()}"
+        except ValueError:
+            pass
+    return os.path.normcase(str(folder.resolve()))
+
+
 def _legacy_key(folder: Path, item: dict) -> str:
-    directory = os.path.normcase(str(folder.resolve()))
+    directory = _legacy_directory_key(folder)
     source = str(item.get("_legacy_source") or item.get("source") or "")
     return f"{directory}|{source}|{item.get('_legacy_id')}|{item['type']}"
 
@@ -542,17 +555,27 @@ def legacy_commit(payload: LegacyCommit, db: Session = Depends(get_db)):
     root = Path(payload.get("path") or legacy_banks_dir())
     if not root.exists():
         raise HTTPException(404, "旧版目录不存在")
-    create_backup()
+    try:
+        return import_legacy_banks(root, db, create_safety_backup=True)
+    except Exception as exc:
+        raise HTTPException(422, f"迁移已回滚：{exc}")
+
+
+def import_legacy_banks(root: Path, db: Session, create_safety_backup: bool) -> dict:
+    if create_safety_backup:
+        create_backup()
     user = local_user(db)
     result = {"banks": 0, "questions": 0, "collections": 0, "sessions": 0, "skipped": 0, "invalid_questions": 0, "unmatched_states": 0, "issues": []}
     try:
         for folder in sorted(p for p in root.iterdir() if p.is_dir()):
             bank = db.scalar(select(QuestionBank).where(and_(QuestionBank.workspace_id == user.workspace_id, QuestionBank.name == folder.name)))
             if not bank:
-                bank = QuestionBank(workspace_id=user.workspace_id, name=folder.name, description="从旧版 QuizVault 迁移")
+                bank = QuestionBank(workspace_id=user.workspace_id, name=folder.name, description="由本地 banks 自动导入")
                 db.add(bank)
                 db.flush()
                 result["banks"] += 1
+            elif bank.description == "从旧版 QuizVault 迁移":
+                bank.description = "由本地 banks 自动导入"
             scan = scan_legacy_bank(folder)
             result["issues"].extend({"bank": folder.name, **issue} for issue in scan["issues"])
             legacy_items = scan["questions"]
@@ -581,10 +604,18 @@ def legacy_commit(payload: LegacyCommit, db: Session = Depends(get_db)):
                 source_order.append(question.id)
             migrate_legacy_states(db, user.id, bank.id, folder, _legacy_candidates(legacy_items), source_order, result)
         db.commit()
-    except Exception as exc:
+    except Exception:
         db.rollback()
-        raise HTTPException(422, f"迁移已回滚：{exc}")
+        raise
     return result
+
+
+def auto_import_legacy_banks() -> dict | None:
+    root = legacy_banks_dir()
+    if not root.is_dir():
+        return None
+    with Session(engine) as db:
+        return import_legacy_banks(root, db, create_safety_backup=False)
 
 
 def migrate_legacy_states(db: Session, user_id: str, bank_id: str, folder: Path, candidates: dict, source_order: list[str | None], result: dict):
@@ -649,7 +680,7 @@ def migrate_legacy_states(db: Session, user_id: str, bank_id: str, folder: Path,
         return
     try:
         progress = json.loads(progress_file.read_text(encoding="utf-8"))
-        source_key = os.path.normcase(str(progress_file.resolve()))
+        source_key = f"{_legacy_directory_key(folder)}/quiz_progress.json"
         existing = db.scalars(select(QuizSession).where(and_(QuizSession.user_id == user_id, QuizSession.bank_id == bank_id))).all()
         if any(session.config.get("legacy_progress_source") == source_key for session in existing):
             return

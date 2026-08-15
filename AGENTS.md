@@ -15,6 +15,7 @@ QuizVault v2 is a local Web desktop quiz application. It is independent from the
 Question types are `single`, `multi`, `any`, `truefalse`, `fill`, and `essay`. Keep validation, normalization, fingerprints, and grading in `server/app/domain.py`.
 
 Imports must retain the preview, row validation, deduplication, and atomic commit workflow. Legacy migration must never modify the sibling `QuizVault/banks/` source files.
+Desktop startup automatically imports detected or bundled `banks` content into SQLite. Keep this import idempotent and do not add a manual legacy-migration UI.
 
 ## Commands
 

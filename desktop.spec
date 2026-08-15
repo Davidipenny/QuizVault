@@ -6,8 +6,12 @@ datas = [
     (str(root / "web" / "dist"), "web/dist"),
     (str(root / "server" / "alembic"), "server/alembic"),
     (str(root / "server" / "alembic.ini"), "server"),
-    (str(root / "parse_markdown.py"), "."),
 ]
+source_banks = root / "banks"
+if not source_banks.is_dir():
+    source_banks = root.parent / "QuizVault" / "banks"
+if source_banks.is_dir():
+    datas.append((str(source_banks), "banks"))
 
 a = Analysis(
     ["desktop.py"],

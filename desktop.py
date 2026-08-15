@@ -74,11 +74,16 @@ def main() -> None:
             executable_dir / "banks",
             executable_dir.parent / "banks",
             executable_dir.parent.parent / "QuizVault" / "banks",
+            root / "banks",
         ]
     else:
         legacy_candidates = [root / "banks", root.parent / "QuizVault" / "banks"]
     legacy_banks = next((path for path in legacy_candidates if path.is_dir()), legacy_candidates[0])
     os.environ.setdefault("QUIZVAULT_LEGACY_BANKS", str(legacy_banks))
+    if legacy_banks.is_dir():
+        os.environ.setdefault("QUIZVAULT_AUTO_IMPORT_BANKS", "1")
+    if getattr(sys, "frozen", False) and legacy_banks == root / "banks":
+        os.environ.setdefault("QUIZVAULT_LEGACY_SOURCE_ID", "bundled-banks")
     port = available_port()
 
     from app.main import app as api_app
@@ -119,6 +124,8 @@ def main() -> None:
                     raise
             health = json.loads(request("/api/v1/health"))
             banks = json.loads(request("/api/v1/banks"))
+            if os.environ.get("QUIZVAULT_AUTO_IMPORT_BANKS") == "1" and legacy_banks.is_dir() and not banks:
+                raise RuntimeError("启动时未自动导入 banks 题库")
             persisted = any(bank.get("name") == "__smoke_persistence__" for bank in banks)
             if os.environ.get("QUIZVAULT_SMOKE_EXPECT_EXISTING") == "1" and not persisted:
                 raise RuntimeError("重启后未找到冒烟测试数据")

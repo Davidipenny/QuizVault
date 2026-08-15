@@ -6,7 +6,7 @@ QuizVault v2 是独立于旧 Tkinter 版本的 Windows 本地刷题应用，使�
 
 双击 `dist/QuizVault.exe`。应用数据和备份保存在 `%APPDATA%\QuizVault\`。
 
-若旧版位于同级目录 `QuizVault/`，迁移向导会自动读取 `../QuizVault/banks/`。进入“录题中心 -> 旧版迁移”，先扫描报告，再执行备份和迁移；旧文件不会被修改。
+若同级旧项目中存在 `QuizVault/banks/`，应用启动时会自动、幂等地导入其中的题库，无需手动迁移；旧文件不会被修改。PyInstaller 构建时会将检测到的原 `banks` 一并打入 EXE，因此安装后也能直接识别这些题库。
 
 数据库在每次启动时通过 Alembic 升级。备份使用 SQLite Online Backup API，包含 WAL 中已提交的数据；损坏备份会保留并标记为不可恢复。普通刷题不会在提交前返回答案，背题模式可显式查看答案，学习记录支持筛选未做题。
 
