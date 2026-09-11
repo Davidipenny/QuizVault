@@ -2,7 +2,6 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Connection, Delete, Edit, MoreFilled, Plus, Reading } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, jsonBody } from '../api'
 import { useAppStore } from '../stores/app'
 import type { Bank } from '../types'
@@ -65,9 +64,9 @@ function formatDate(value?: string) { return value ? new Date(value).toLocaleDat
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-tooltip content="开始刷题"><el-button :icon="Reading" circle plain @click="router.push({ path: '/quiz/setup', query: { bank: row.id } })" /></el-tooltip>
-            <el-tooltip content="编辑"><el-button :icon="Edit" circle plain @click="open(row)" /></el-tooltip>
-            <el-tooltip content="合并题库"><el-button :icon="Connection" circle plain @click="merging=row" /></el-tooltip>
-            <el-tooltip content="删除"><el-button :icon="Delete" circle plain type="danger" @click="remove(row)" /></el-tooltip>
+            <el-tooltip content="编辑"><el-button :icon="Edit" circle plain @click="open(row as Bank)" /></el-tooltip>
+            <el-tooltip content="合并题库"><el-button :icon="Connection" circle plain @click="merging=row as Bank" /></el-tooltip>
+            <el-tooltip content="删除"><el-button :icon="Delete" circle plain type="danger" @click="remove(row as Bank)" /></el-tooltip>
             <el-tooltip content="题目管理"><el-button :icon="MoreFilled" circle plain @click="router.push(`/banks/${row.id}/questions`)" /></el-tooltip>
           </template>
         </el-table-column>

@@ -2,7 +2,6 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Back, CopyDocument, Delete, Edit, Plus, Rank } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import QuestionEditor from '../components/QuestionEditor.vue'
 import { api, jsonBody } from '../api'
 import { useAppStore } from '../stores/app'
@@ -65,8 +64,8 @@ async function runBatch() {
         <el-table-column label="题干" min-width="360" show-overflow-tooltip><template #default="{row}">{{ row.prompt }}</template></el-table-column>
         <el-table-column prop="source" label="来源" width="150" show-overflow-tooltip />
         <el-table-column label="操作" width="104" fixed="right"><template #default="{row}">
-          <el-tooltip content="编辑"><el-button :icon="Edit" circle plain @click="open(row)" /></el-tooltip>
-          <el-tooltip content="删除"><el-button :icon="Delete" circle plain type="danger" @click="remove(row)" /></el-tooltip>
+          <el-tooltip content="编辑"><el-button :icon="Edit" circle plain @click="open(row as EditableQuestion)" /></el-tooltip>
+          <el-tooltip content="删除"><el-button :icon="Delete" circle plain type="danger" @click="remove(row as EditableQuestion)" /></el-tooltip>
         </template></el-table-column>
       </el-table>
       <div class="pager"><el-pagination v-model:current-page="query.page" :page-size="query.page_size" :total="total" layout="total, prev, pager, next" /></div>

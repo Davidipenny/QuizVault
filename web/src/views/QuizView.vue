@@ -2,7 +2,6 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, Back, EditPen, Flag, FolderAdd, Star } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { api, jsonBody } from '../api'
 import type { Question } from '../types'
 

@@ -2,7 +2,6 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Clock, Reading } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { api, jsonBody } from '../api'
 import { useAppStore } from '../stores/app'
 

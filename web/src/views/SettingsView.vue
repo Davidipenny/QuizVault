@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { Download, Refresh } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { api, authorizedDownloadUrl, fileAsBase64, jsonBody } from '../api'
 import { useAppStore } from '../stores/app'
 

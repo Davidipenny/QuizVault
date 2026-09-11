@@ -2,7 +2,6 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Document, Upload } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { api, authorizedDownloadUrl, fileAsBase64, jsonBody } from '../api'
 import { useAppStore } from '../stores/app'
 
