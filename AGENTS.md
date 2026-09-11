@@ -4,6 +4,8 @@
 
 QuizVault v2 is a local Web desktop quiz application. It is independent from the sibling legacy Tkinter project.
 
+GitHub: this workspace pushes to `Davidipenny/QuizVault` — `master` holds QuizVault v2, the `legacy` branch preserves the old Tkinter app. Releases carry the packaged `QuizVault.exe`; the bundled `banks/` content is the shared question-bank source (export from SQLite with `scripts/export_banks.py`).
+
 ## Architecture
 
 - `web/`: Vue 3, TypeScript, Vite, Pinia, Vue Router, and Element Plus.
