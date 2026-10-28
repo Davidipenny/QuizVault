@@ -6,7 +6,7 @@ QuizVault v2 是 Windows 本地刷题应用，使用 Vue 3、FastAPI 和 SQLite�
 
 ## 使用方式一：下载 EXE（推荐普通用户）
 
-到 [Releases](https://github.com/Davidipenny/QuizVault/releases/latest) 下载 `QuizVault.exe`，双击运行即可：
+到 [Releases](https://github.com/Davidipenny/QuizVault/releases/latest) 下载 `QuizVault.exe`（免安装）或 `QuizVault-Setup.exe`（安装版，内嵌 WebView2 离线运行库，适合全新或离线电脑），双击运行即可：
 
 - 题库已内置，首次启动自动导入；
 - 数据和自动备份保存在 `%APPDATA%\QuizVault\`，卸载或移动程序不影响数据；
