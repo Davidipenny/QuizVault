@@ -1,5 +1,5 @@
 #define AppName "QuizVault"
-#define AppVersion "2.0.0"
+#define AppVersion "2.0.1"
 #define Root ".."
 
 [Setup]

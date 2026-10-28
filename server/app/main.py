@@ -19,6 +19,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from . import __version__
 from .config import API_PREFIX, APP_NAME, data_dir, database_path, frontend_dist_dir, legacy_banks_dir
 from .backups import MAX_BACKUP_SIZE, backup_info, create_backup as create_database_backup, restore_database, validate_database
 from .database import engine, get_db, run_migrations
@@ -44,7 +45,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title=APP_NAME, version="2.0.0", lifespan=lifespan)
+app = FastAPI(title=APP_NAME, version=__version__, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
