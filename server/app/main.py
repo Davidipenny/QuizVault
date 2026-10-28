@@ -171,7 +171,11 @@ def update_bank(bank_id: str, payload: BankUpdate, db: Session = Depends(get_db)
         if field in payload:
             setattr(bank, field, payload[field])
     bank.version += 1
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "题库名称已存在")
     return bank_dict(bank, db.scalar(select(func.count()).where(Question.bank_id == bank.id)) or 0)
 
 
@@ -280,6 +284,8 @@ def batch_questions(payload: BatchQuestions, db: Session = Depends(get_db)):
             changed += 1
     elif action in {"move", "copy"}:
         target_id = payload.get("target_bank_id")
+        if not target_id:
+            raise HTTPException(422, "移动或复制需要目标题库")
         get_bank(db, target_id)
         for q in questions:
             exists = db.scalar(select(Question.id).where(and_(Question.bank_id == target_id, Question.fingerprint == q.fingerprint)))
@@ -571,6 +577,23 @@ def import_legacy_banks(root: Path, db: Session, create_safety_backup: bool) -> 
         for folder in sorted(p for p in root.iterdir() if p.is_dir()):
             bank = db.scalar(select(QuestionBank).where(and_(QuestionBank.workspace_id == user.workspace_id, QuestionBank.name == folder.name)))
             if not bank:
+                # 用户可能已把自动导入的题库改名；通过 legacy_mappings 找回该文件夹
+                # 之前导入到的题库并复用，避免下次启动新建一个空的重复题库。
+                directory_key = _legacy_directory_key(folder)
+                bank = db.scalar(
+                    select(QuestionBank)
+                    .join(Question, Question.bank_id == QuestionBank.id)
+                    .join(LegacyMapping, LegacyMapping.question_id == Question.id)
+                    .where(
+                        and_(
+                            QuestionBank.workspace_id == user.workspace_id,
+                            LegacyMapping.legacy_key >= f"{directory_key}|",
+                            LegacyMapping.legacy_key < f"{directory_key}|\U0010ffff",
+                        )
+                    )
+                    .limit(1)
+                )
+            if not bank:
                 bank = QuestionBank(workspace_id=user.workspace_id, name=folder.name, description="由本地 banks 自动导入")
                 db.add(bank)
                 db.flush()
@@ -810,6 +833,18 @@ def submit_answer(session_id: str, payload: AnswerSubmit, db: Session = Depends(
         raise HTTPException(422, "题目不属于该会话")
     user = local_user(db)
     answer = payload.get("answer", {})
+    try:
+        return _record_answer(db, session, question, answer, user)
+    except IntegrityError:
+        # 并发提交同一道题触发 (session_id, question_id) 唯一约束：
+        # 回滚后重试一次，此时能看到已存在的记录并走幂等更新路径。
+        db.rollback()
+        session = db.get(QuizSession, session_id)
+        question = get_question(db, question.id)
+        return _record_answer(db, session, question, answer, user)
+
+
+def _record_answer(db: Session, session: QuizSession, question: Question, answer: dict, user: User) -> dict:
     result = grade_answer(question_dict(question), answer, bool(session.config.get("compare_essay")))
     existing = db.scalar(select(QuizAnswer).where(and_(QuizAnswer.session_id == session.id, QuizAnswer.question_id == question.id)))
     if session.status != "active" and not existing:

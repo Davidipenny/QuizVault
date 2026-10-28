@@ -8,6 +8,7 @@ if (-not $iscc) {
     $candidate = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
     if (Test-Path -LiteralPath $candidate) { $iscc = $candidate }
 }
+if (-not $iscc) { throw 'Inno Setup 6 compiler was not found; install Inno Setup 6 or put ISCC.exe on PATH.' }
 if (-not (Test-Path -LiteralPath $python)) { throw 'Python environment is missing; run scripts/setup.ps1 first.' }
 if (-not (Test-Path -LiteralPath $runtime)) { throw 'Verified WebView2 offline installer is missing; run scripts/fetch-webview2.ps1 with the pinned SHA256.' }
 if (-not (Test-Path -LiteralPath $runtimeChecksum)) { throw 'WebView2 checksum record is missing; fetch the installer again.' }
@@ -18,7 +19,6 @@ Push-Location $root
 try {
     & $python -m PyInstaller --noconfirm desktop.spec
     if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed.' }
-    if (-not $iscc) { throw 'Inno Setup 6 compiler was not found.' }
     & $iscc (Join-Path $root 'installer\QuizVault.iss')
     if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed.' }
 } finally {
