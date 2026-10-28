@@ -1,8 +1,8 @@
 # 题库格式规范
 
-本文档定义了 QuizVault 的题库数据格式，包括 Markdown 导入格式和 YAML 存储格式。
+本文档定义了 QuizVault 的题库数据格式，包括 v2 统一 JSON、Markdown 导入格式，以及 `banks/` 目录使用的旧版兼容交换格式。
 
-v2.0 运行时使用 SQLite。启动时会只读识别随程序提供或同级旧项目中的 `banks`，并自动、幂等地导入；以下 Markdown/YAML 同时用于自动导入和数据交换，不再是运行时事实来源。新导入建议使用下述统一 JSON 格式。
+v2.0 运行时使用 SQLite。启动时会只读识别随程序提供或同级旧项目中的 `banks`，并自动、幂等地导入；以下是导入与交换格式，不再是运行时事实来源。新导入建议使用下述统一 JSON 格式。
 
 ## 0. v2.0 统一题目 JSON
 
@@ -76,11 +76,11 @@ D. 选项D
 ```
 
 支持的注释：
-- `<!-- truefalse -->` -- 强制当前题目为判断
-- `<!-- single -->` -- 强制当前题目为单选
-- `<!-- multi -->` -- 强制当前题目为多选
+- `<!-- truefalse -->` -- 强制后续题目为判断
+- `<!-- single -->` -- 强制后续题目为单选
+- `<!-- multi -->` -- 强制后续题目为多选
 
-注释仅影响紧跟其后的那一道题，之后的题目恢复使用章节默认类型。
+注释一旦出现会持续生效，直到下一个章节标题或另一条类型注释，而非只影响紧跟其后的一道题。此外，由标题或注释显式指定的单选/多选类型不会因答案字母数量被自动纠正（见 1.3）。
 
 ### 1.3 题目格式
 
@@ -105,11 +105,13 @@ D. 选项D
 | 元素 | 格式 | 说明 |
 |------|------|------|
 | 题号 | `**数字.**` | 必须是数字后跟句点，用 `**` 粗体包裹 |
-| 题干 | `**题号. 题干文本**` | 包含在粗体标记内，通常以 `（　）` 结尾 |
-| 选项 | `A. 文本` | 每行一个，以大写字母加句点开头，A-D 共 4 个 |
-| 答案 | `**答案：X**` | 粗体包裹，冒号后为答案字母 |
+| 题干 | `**题号. 题干文本（　）**` | 包含在粗体标记内；必须含有全角括号 `（　）`，否则整道题不会被解析 |
+| 选项 | `A. 文本` | 每行一个，以大写字母 A-D 加句点开头 |
+| 答案 | `**答案：X**` | 粗体包裹，冒号后为 A-D 内的答案字母 |
 | 解析 | `**解析：**` | 粗体标记"解析："后跟解析文本 |
 | 分隔线 | `---` | 可选，用于分隔各题 |
+
+题型自动纠正：单选题的答案含多个字母时自动按多选题处理；多选题（仅由"一、单项选择题"这类章节标记推断、未经标题或注释显式指定）的答案只有一个字母时自动回退为单选题。
 
 ### 1.4 完整示例
 
@@ -168,183 +170,37 @@ D. 与时俱进
 ---
 ````
 
-## 2. YAML 存储格式
+## 2. `banks/` 目录交换格式（旧版兼容）
 
-题库数据存储在 `questions.yaml` 文件中（若未安装 PyYAML，自动 fallback 到 `questions.json`）。
+自动导入扫描 `banks/<题库名>/` 下的 `questions.md`（上节格式）和 `*.json`。JSON 文件使用旧版兼容结构，同时携带 v2 的 `answer_spec`：
 
-### 2.1 文件结构
-
-```yaml
-meta:
-  version: 1
-  updated: "2026-06-28"
-  source_files:
-    - "毛概选择题（含解析）.md"
-  total: 75
-  truefalse_count: 10
-  single_count: 40
-  multi_count: 25
-
-questions:
-  - id: 1
-    type: single
-    question: "题目文本"
-    options:
-      - "A. 选项A"
-      - "B. 选项B"
-      - "C. 选项C"
-      - "D. 选项D"
-    answer: "A"
-    explanation: "解析内容"
-    source: "毛概选择题（含解析）.md"
-    content_hash: "a1b2c3d4"
-    flagged: false
-    flag_reason: null
+```json
+{
+  "questions": [
+    {
+      "id": 1,
+      "type": "single",
+      "question": "毛泽东思想形成和发展的实践基础是（　）",
+      "options": {"A": "中国工人运动的发展", "B": "马克思列宁主义在中国的传播", "C": "中国共产党领导人民进行革命", "D": "中国革命和建设的丰富实践"},
+      "answer_spec": {"correct": ["C"]},
+      "answer": "C",
+      "explanation": "解析内容"
+    }
+  ]
+}
 ```
 
-### 2.2 meta 字段说明
+| 字段 | 说明 |
+|------|------|
+| `id` / `type` / `question` / `options` / `answer` | 旧版 v1 字段；`options` 为字典，`answer` 为字母串 |
+| `answer_spec` | v2 答案结构，与第 0 节一致；缺失时由 `answer` 推导 |
+| `explanation` | 解析，可省略 |
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| version | int | 是 | 格式版本号，当前为 1 |
-| updated | string | 是 | 最后更新日期，格式 YYYY-MM-DD |
-| source_files | list | 是 | 导入来源文件名列表 |
-| total | int | 是 | 题目总数 |
-| truefalse_count | int | 是 | 判断题数量 |
-| single_count | int | 是 | 单选题数量 |
-| multi_count | int | 是 | 多选题数量 |
+导入时同样执行第 0 节的校验与 SHA-256 指纹去重，重复内容按 `legacy_mappings` 幂等跳过。可用 `scripts/export_banks.py` 从 SQLite 导出此格式。
 
-`meta` 中的 `total`、`truefalse_count`、`single_count`、`multi_count` 在每次保存时自动重新计算，无需手动维护。
+> 历史说明：v1 曾使用 `questions.yaml` 存储（含 `meta` 统计块、`content_hash`（MD5 前缀）与 `flagged` 字段），并由独立的 `import_questions.py` 校验。该工具链已随 v2 移除，此处仅作记录；请勿按其编写新数据。
 
-### 2.3 questions 字段说明
-
-每道题是一个列表项，包含以下字段：
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| id | int | 是 | 题目编号，同类型内唯一（判断 1-N，单选 1-N，多选 1-N） |
-| type | string | 是 | 题型：`"truefalse"`、`"single"` 或 `"multi"` |
-| question | string | 是 | 题目文本（不含题号和括号） |
-| options | list | 是 | 选项列表，判断题 2 个，单选/多选 3-4 个 |
-| answer | string | 是 | 答案（见下方答案格式规则） |
-| explanation | string | 否 | 解析内容，可为空字符串 |
-| source | string | 否 | 来源文件名 |
-| content_hash | string | 否 | 题目文本的内容哈希（MD5 前 8 位），用于去重 |
-| flagged | bool | 否 | 是否标记为待修改，默认 `false` |
-| flag_reason | string | 否 | 标记原因，无标记时为 `null` |
-
-### 2.4 完整示例
-
-```yaml
-meta:
-  version: 1
-  updated: "2026-06-28"
-  source_files:
-    - "毛概选择题（含解析）.md"
-  total: 3
-  truefalse_count: 1
-  single_count: 1
-  multi_count: 1
-
-questions:
-  - id: 1
-    type: truefalse
-    question: 实践是检验真理的唯一标准
-    options:
-      - A. 正确
-      - B. 错误
-    answer: A
-    explanation: 这是马克思主义认识论的基本观点。
-    source: 毛概选择题（含解析）.md
-    content_hash: a1b2c3d4
-    flagged: false
-    flag_reason: null
-  - id: 1
-    type: single
-    question: 毛泽东思想形成和发展的时代条件是
-    options:
-      - A. 俄国十月革命开辟了世界无产阶级社会主义革命的新时代
-      - B. 1840年以后中国人民面临的反帝反封建任务
-      - C. 五四运动开辟了世界无产阶级社会主义革命的新时代
-      - D. 中国革命和建设的丰富实践
-    answer: A
-    explanation: 毛泽东思想形成于20世纪前中期，当时的时代条件是俄国十月革命的胜利开辟了世界无产阶级社会主义革命的新时代。
-    source: 毛概选择题（含解析）.md
-    content_hash: 0e787b6c
-    flagged: false
-    flag_reason: null
-  - id: 1
-    type: multi
-    question: 毛泽东思想的科学内涵包括
-    options:
-      - A. 马克思列宁主义在中国的运用和发展
-      - B. 被实践证明了的关于中国革命和建设的正确的理论原则和经验总结
-      - C. 中国共产党集体智慧的结晶
-      - D. 毛泽东个人的思想
-    answer: ABC
-    explanation: 毛泽东思想不等于毛泽东个人的思想，它是党和人民集体智慧的结晶。
-    source: 毛概选择题（含解析）.md
-    content_hash: ef10c4f9
-    flagged: false
-    flag_reason: null
-```
-
-## 3. 校验规则
-
-导入工具 (`import_questions.py`) 在导入时对每道题执行以下校验。
-
-### 3.1 必填字段
-
-以下字段必须存在且不为空：
-
-- `id` -- 题目编号
-- `type` -- 题型
-- `question` -- 题目文本
-- `options` -- 选项列表
-- `answer` -- 答案
-
-缺少任一必填字段的题目将被拒绝导入。
-
-### 3.2 题型校验
-
-`type` 字段必须是以下三个值之一：
-
-- `truefalse` -- 判断题
-- `single` -- 单选题
-- `multi` -- 多选题
-
-### 3.3 选项校验
-
-- 判断题：必须恰好 2 个选项（A、B）
-- 单选/多选题：必须 3-4 个选项（A-C 或 A-D）
-- 选项以列表或字典形式存储均可，导入时自动转换
-
-### 3.4 答案格式校验
-
-**判断题（type: truefalse）：**
-- 答案必须是 A 或 B
-- 示例：`A`、`B`
-- 错误示例：`C`（超出范围）、`AB`（多于一个字母）
-
-**单选题（type: single）：**
-- 答案必须是 A-D 中的恰好一个字母
-- 示例：`A`、`B`、`C`、`D`
-- 错误示例：`AB`（多于一个字母）、`E`（超出范围）
-
-**多选题（type: multi）：**
-- 答案必须是 2-4 个不重复的 A-D 字母
-- 字母顺序无关紧要（`ABC` 和 `CBA` 等价）
-- 示例：`AB`、`ABC`、`ABCD`
-- 错误示例：`A`（仅一个字母）、`AAB`（有重复）、`ABCDE`（超出范围）
-
-### 3.5 去重规则
-
-- 基于题目文本 (`question` 字段) 计算 MD5 哈希值，取前 8 位作为 `content_hash`
-- 计算前会去除题目文本首尾的空格和标点符号
-- 同一哈希值的题目不会重复导入（除非使用 `--force` 参数）
-- 单选题和多选题使用相同的题号范围（1-50 / 1-25），但 `content_hash` 前会加上类型前缀以区分
-
-## 4. AI 生成题目模板
+## 3. AI 生成题目模板
 
 将以下提示词粘贴给 AI，可生成符合导入格式的题目：
 
