@@ -1,0 +1,7 @@
+{
+  "questions": [
+    {"id": 1, "type": "truefalse", "question": "重复旧编号但不同题型", "options": {"A": "正确", "B": "错误"}, "answer": "A"},
+    {"id": 2, "type": "truefalse", "question": "JSON 题目", "options": {"A": "正确", "B": "错误"}, "answer": "A"},
+    {"id": 3, "type": "single", "question": "已删除题目", "options": {"A": "甲", "B": "乙"}, "answer": "A"}
+  ]
+}

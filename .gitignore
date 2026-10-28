@@ -3,8 +3,8 @@ __pycache__/
 *.pyc
 *.pyo
 
-# 旧版单文件题库（已被 banks/ 文件夹题库取代）
-questions.json
+# 旧版单文件题库（已被 banks/ 文件夹题库取代；锚定根目录避免误伤 banks/*/questions.json）
+/questions.json
 
 # ─── 题库运行时数据（每个题库文件夹内自动生成） ───
 # 错题本：答错的题目记录及次数
@@ -32,6 +32,8 @@ installer/vendor/
 # Claude Code 的项目级配置和记忆文件
 .claude/
 CLAUDE.md
+# ZCode 的会话工作目录
+.zcode/
 # Superpowers 开发工具的工作文件
 .superpowers/
 # Superpowers 生成的设计文档和计划
