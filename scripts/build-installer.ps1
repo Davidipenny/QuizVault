@@ -5,8 +5,12 @@ $runtime = Join-Path $root 'installer\vendor\MicrosoftEdgeWebView2RuntimeInstall
 $runtimeChecksum = "$runtime.sha256"
 $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
 if (-not $iscc) {
-    $candidate = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-    if (Test-Path -LiteralPath $candidate) { $iscc = $candidate }
+    foreach ($candidate in @(
+        (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe')
+    )) {
+        if (Test-Path -LiteralPath $candidate) { $iscc = $candidate; break }
+    }
 }
 if (-not $iscc) { throw 'Inno Setup 6 compiler was not found; install Inno Setup 6 or put ISCC.exe on PATH.' }
 if (-not (Test-Path -LiteralPath $python)) { throw 'Python environment is missing; run scripts/setup.ps1 first.' }
