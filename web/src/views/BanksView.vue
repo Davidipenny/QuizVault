@@ -24,18 +24,22 @@ function open(bank?: Bank) {
 }
 async function save() {
   if (!form.name.trim()) return ElMessage.warning('请输入题库名称')
-  if (editing.value) await api(`/banks/${editing.value.id}`, { method: 'PATCH', ...jsonBody(form) })
-  else await api('/banks', { method: 'POST', ...jsonBody(form) })
-  dialog.value = false; await store.loadBanks(); ElMessage.success('题库已保存')
+  try {
+    if (editing.value) await api(`/banks/${editing.value.id}`, { method: 'PATCH', ...jsonBody(form) })
+    else await api('/banks', { method: 'POST', ...jsonBody(form) })
+    dialog.value = false; await store.loadBanks(); ElMessage.success('题库已保存')
+  } catch { /* 失败提示由 api 层统一处理，对话框保持打开 */ }
 }
 async function remove(bank: Bank) {
-  await ElMessageBox.confirm(`删除“${bank.name}”及其全部题目和记录？`, '删除题库', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+  try { await ElMessageBox.confirm(`删除“${bank.name}”及其全部题目和记录？`, '删除题库', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }) } catch { return }
   await api(`/banks/${bank.id}`, { method: 'DELETE' }); await store.loadBanks()
 }
 async function merge() {
   if (!merging.value || !mergeSource.value) return
-  const result = await api<any>(`/banks/${merging.value.id}/merge`, { method:'POST', ...jsonBody({ source_bank_id:mergeSource.value }) })
-  merging.value=null; mergeSource.value=''; await store.loadBanks(); ElMessage.success(`已合并 ${result.copied} 道题，跳过 ${result.skipped} 道重复题`)
+  try {
+    const result = await api<any>(`/banks/${merging.value.id}/merge`, { method:'POST', ...jsonBody({ source_bank_id:mergeSource.value }) })
+    merging.value=null; mergeSource.value=''; await store.loadBanks(); ElMessage.success(`已合并 ${result.copied} 道题，跳过 ${result.skipped} 道重复题`)
+  } catch { /* 失败提示由 api 层统一处理，对话框保持打开 */ }
 }
 function formatDate(value?: string) { return value ? new Date(value).toLocaleDateString() : '尚未学习' }
 </script>
@@ -54,7 +58,8 @@ function formatDate(value?: string) { return value ? new Date(value).toLocaleDat
     </div>
     <div class="panel">
       <div class="panel-header"><el-input v-model="search" clearable placeholder="搜索题库、介绍或标签" style="max-width:360px" /></div>
-      <el-table v-if="filtered.length" :data="filtered" v-loading="store.loading" @row-dblclick="(row: Bank) => router.push(`/banks/${row.id}/questions`)">
+      <div v-loading="store.loading">
+      <el-table v-if="filtered.length" :data="filtered" @row-dblclick="(row: Bank) => router.push(`/banks/${row.id}/questions`)">
         <el-table-column label="题库" min-width="260">
           <template #default="{ row }"><div class="bank-name">{{ row.name }}</div><div class="muted bank-desc">{{ row.description || '暂无介绍' }}</div></template>
         </el-table-column>
@@ -71,7 +76,8 @@ function formatDate(value?: string) { return value ? new Date(value).toLocaleDat
           </template>
         </el-table-column>
       </el-table>
-      <div v-else class="empty">{{ search ? '没有匹配的题库' : '还没有题库，请先新建或迁移旧题库' }}</div>
+      <div v-else class="empty">{{ search ? '没有匹配的题库' : '还没有题库，请先新建' }}</div>
+      </div>
     </div>
     <el-dialog v-model="dialog" :title="editing ? '编辑题库' : '新建题库'" width="min(520px, 92vw)">
       <el-form label-position="top">

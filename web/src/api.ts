@@ -1,17 +1,31 @@
 const token = new URLSearchParams(location.search).get('token') || sessionStorage.getItem('qv-token') || ''
 if (token) sessionStorage.setItem('qv-token', token)
 
+// 统一的失败提示：动态引入消息组件的细粒度模块，保持按需加载、不进入主包
+function notifyError(message: string) {
+  import('element-plus/es/components/message/index.mjs')
+    .then(({ ElMessage }) => ElMessage.error({ message, grouping: true }))
+    .catch(() => {})
+}
+
 export async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers)
   if (options.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json')
   if (token) headers.set('X-QuizVault-Token', token)
-  const response = await fetch(`/api/v1${path}`, { ...options, headers })
+  let response: Response
+  try {
+    response = await fetch(`/api/v1${path}`, { ...options, headers })
+  } catch {
+    notifyError('无法连接本地服务，请确认程序仍在运行')
+    throw new Error('无法连接本地服务')
+  }
   if (!response.ok) {
     let message = response.statusText
     try {
       const data = await response.json()
       message = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)
     } catch { /* use status text */ }
+    notifyError(message || '请求失败')
     throw new Error(message || '请求失败')
   }
   if (response.status === 204) return undefined as T

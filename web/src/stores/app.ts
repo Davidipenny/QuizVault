@@ -7,7 +7,7 @@ export const useAppStore = defineStore('app', {
   actions: {
     async loadBanks() {
       this.loading = true
-      try { this.banks = await api<Bank[]>('/banks') } finally { this.loading = false }
+      try { this.banks = await api<Bank[]>('/banks') } catch { /* 失败提示由 api 层统一处理 */ } finally { this.loading = false }
     },
     setDark(value: boolean) {
       this.dark = value; localStorage.setItem('qv-dark', value ? '1' : '0')

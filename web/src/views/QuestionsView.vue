@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Back, CopyDocument, Delete, Edit, Plus, Rank } from '@element-plus/icons-vue'
 import QuestionEditor from '../components/QuestionEditor.vue'
@@ -17,9 +17,11 @@ const batch = reactive({ action: 'copy', target_bank_id: '' })
 const typeLabels: Record<string,string> = { single:'单选', multi:'多选', any:'任意选', truefalse:'判断', fill:'填空', essay:'问答' }
 
 onMounted(async () => { if (!store.banks.length) await store.loadBanks(); await load() })
-watch(() => [query.type, query.page], load)
+watch(() => query.page, load)
+watch(() => query.type, () => { if (query.page !== 1) query.page = 1; else load() })
 let timer: number
 watch(() => query.search, () => { clearTimeout(timer); timer = window.setTimeout(() => { query.page=1; load() }, 250) })
+onUnmounted(() => clearTimeout(timer))
 async function load() {
   loading.value = true
   try {
@@ -33,16 +35,19 @@ async function save(value: EditableQuestion) {
     if (editing.value?.id) await api(`/questions/${editing.value.id}`, { method:'PUT', ...jsonBody(value) })
     else await api(`/banks/${bankId.value}/questions`, { method:'POST', ...jsonBody(value) })
     drawer.value=false; await load(); await store.loadBanks(); ElMessage.success('题目已保存')
-  } catch (error:any) { ElMessage.error(error.message) }
+  } catch { /* 失败提示由 api 层统一处理，抽屉保持打开 */ }
 }
 async function remove(question: EditableQuestion) {
-  await ElMessageBox.confirm('确认删除这道题？', '删除题目', { type:'warning' }); await api(`/questions/${question.id}`, { method:'DELETE' }); await load()
+  try { await ElMessageBox.confirm('确认删除这道题？', '删除题目', { type:'warning' }) } catch { return }
+  await api(`/questions/${question.id}`, { method:'DELETE' }); await load()
 }
 async function runBatch() {
   if (!selected.value.length) return
   if (batch.action !== 'delete' && !batch.target_bank_id) return ElMessage.warning('请选择目标题库')
-  await api('/questions/batch', { method:'POST', ...jsonBody({ action:batch.action, target_bank_id:batch.target_bank_id, question_ids:selected.value.map(x=>x.id) }) })
-  batchDialog.value=false; selected.value=[]; await load(); await store.loadBanks(); ElMessage.success('批量操作完成')
+  try {
+    await api('/questions/batch', { method:'POST', ...jsonBody({ action:batch.action, target_bank_id:batch.target_bank_id, question_ids:selected.value.map(x=>x.id) }) })
+    batchDialog.value=false; selected.value=[]; await load(); await store.loadBanks(); ElMessage.success('批量操作完成')
+  } catch { /* 失败提示由 api 层统一处理，对话框保持打开 */ }
 }
 </script>
 

@@ -10,5 +10,6 @@ export default createRouter({
     { path: '/quiz/:sessionId', component: () => import('./views/QuizView.vue') },
     { path: '/study', component: () => import('./views/StudyView.vue') },
     { path: '/settings', component: () => import('./views/SettingsView.vue') },
+    { path: '/:pathMatch(.*)*', redirect: '/banks' },
   ],
 })
